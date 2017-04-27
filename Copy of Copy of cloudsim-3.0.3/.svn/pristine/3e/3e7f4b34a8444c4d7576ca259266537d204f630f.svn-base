@@ -1,0 +1,540 @@
+package org.cloudbus.cloudsim.hust.pso;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.Random;
+import java.util.Vector;
+
+import org.cloudbus.cloudsim.hust.pso.Particle;
+import org.cloudbus.cloudsim.hust.utils.Utils;
+import org.cloudbus.cloudsim.hust.base.PhysicalMachine;
+import org.cloudbus.cloudsim.hust.base.VirtualMachine;
+
+/**
+ * A swarm of particles
+ */
+public class Swarm implements Iterable<Particle> {
+
+	public static double DEFAULT_GLOBAL_INCREMENT = 0.9;
+	public static double DEFAULT_INERTIA = 0.95;
+	public static int DEFAULT_NUMBER_OF_PARTICLES =300; //有利于初始解的形成
+	public static double DEFAULT_PARTICLE_INCREMENT = 0.9;
+
+	/** Best fitness so far (global best) */
+	double bestFitness;
+	/** Index of best particle so far */
+	int bestParticleIndex;
+	/** Best position so far (global best) */
+	int bestPosition[];
+	/** Fitness function for this swarm */
+	FitnessFunction fitnessFunction;
+	/** Global increment (for velocity update), usually called 'c2' constant */
+	double globalIncrement;
+	/** Inertia (for velocity update), usually called 'w' constant */
+	double inertia;
+	/** How many times 'particle.evaluate()' has been called? */
+	int numberOfEvaliations;
+	/** Number of particles in this swarm */
+	int numberOfParticles;
+	/** Particle's increment (for velocity update), usually called 'c1' constant */
+	double particleIncrement;
+	/** Particles in this swarm */
+	Particle particles[];
+	/** Particle update strategy */
+	ParticleUpdate particleUpdate; //多态的一种形式
+	/** A sample particles: Build other particles based on this one */
+	Particle sampleParticle;
+	/** A collection used for 'Iterable' interface */
+	ArrayList<Particle> particlesList;
+	
+	//粒子在局部最优值下的速度向量
+	int globalBestVelocity[];
+	
+	int numberOfIterations;
+	
+	//to keep an array of the average fitness per particle
+	ArrayList<double[]> averageFitnesses ;
+	
+	PhysicalMachine [] physicalMachine;
+	
+	VirtualMachine  [] virtualMachine;
+	
+	PhysicalMachine [] bestSet;
+	//最优负载下的物理机与虚拟机之间的映射
+	HashMap<Integer,Vector<Integer>>bestDeployMap;
+	
+	//虚拟机对应的物理机下标
+	int []best_vm_pm_map_Array;
+
+	//-------------------------------------------------------------------------
+	// Constructors
+	//-------------------------------------------------------------------------
+
+	/**
+	 * Create a Swarm and set default values
+	 * @param numberOfParticles : Number of particles in this swarm (should be greater than 0). 
+	 * If unsure about this parameter, try Swarm.DEFAULT_NUMBER_OF_PARTICLES or greater
+	 * @param sampleParticle : A particle that is a sample to build all other particles
+	 * @param fitnessFunction : Fitness function used to evaluate each particle
+	 */
+	public Swarm(PhysicalMachine[]physicalMachine,VirtualMachine[] virtualMachine,int numberOfIterations,int numberOfParticles, Particle sampleParticle, FitnessFunction fitnessFunction) {
+		if (sampleParticle == null) 
+			throw new RuntimeException("Sample particle can't be null!");
+		if (numberOfParticles <= 0) 
+			throw new RuntimeException("Number of particles should be greater than zero.");
+
+		globalIncrement = DEFAULT_GLOBAL_INCREMENT;
+		numberOfEvaliations = 0;
+		this.numberOfParticles = numberOfParticles;
+		this.sampleParticle = sampleParticle;
+		this.fitnessFunction = fitnessFunction;
+		bestFitness = Double.NaN;
+		bestParticleIndex = -1;
+		globalBestVelocity=new int [physicalMachine.length];
+		this.best_vm_pm_map_Array=new int[virtualMachine.length];
+
+		// Set up particle update strategy (default: ParticleUpdateSimple) 
+		particleUpdate = new ParticleUpdateImpl(sampleParticle);
+
+		particlesList = null;
+		this.numberOfIterations=numberOfIterations;
+		
+		this.physicalMachine=physicalMachine;
+		this.virtualMachine=virtualMachine;
+		
+		averageFitnesses = new ArrayList<double[]>();
+        
+		//fill the averageFitnesses with empty arrays
+        for(int i = 0 ; i < numberOfParticles ; i++){
+        	averageFitnesses.add(new double[numberOfIterations]);
+        }
+	}
+	
+	/**
+	 * @param iter  当前迭代次数
+	 * @param curr_temp  当前温度，用于模拟退火算法使用
+	 * @throws IOException
+	 */
+	public void evolve(int iter,double curr_temp) {
+		// Initialize (首次运行之前需要进行初始化操作)
+		if (particles == null){
+			init(this.physicalMachine.clone(),this.virtualMachine.clone());
+		}
+
+		//这个函数中，将评估和更新放在一块进行考虑
+		evaluate_update(iter,curr_temp); // Evaluate particles
+	}
+	
+	//使用指定的【位置最大值，最小值数组】【速度的最大值，最小值数组】，来初始化一个粒子群
+	public void init(PhysicalMachine[]physicalMachine,VirtualMachine[] virtualMachine) {
+         int dimension=physicalMachine.length;
+         this.particles=new Particle[this.numberOfParticles];
+		// Init each particle
+		for (int i = 0; i < numberOfParticles; i++) {
+			//空指针错误
+			particles[i] = new Particle(dimension); 
+			//初始化每一个粒子，这里使用随机化算法来获取初始解
+			particles[i].init(physicalMachine.clone(),virtualMachine.clone(),i,numberOfParticles); // Initialize it
+		}
+	}
+
+	/**
+	 * Evaluate fitness function for every particle
+	 * @param iterNum  当前迭代次数
+	 * @param curr_temp  当前降温温度
+	 */
+	public void evaluate_update(int iterNum,double curr_temp) {
+		if (particles == null) 
+			throw new RuntimeException("No particles in this swarm! May be you need to call Swarm.init() method");
+		if (fitnessFunction == null) 
+			throw new RuntimeException("No fitness function in this swarm! May be you need to call Swarm.setFitnessFunction() method");
+
+		// Initialize
+		if (Double.isNaN(bestFitness)) {
+			bestFitness = (fitnessFunction.isMaximize() ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY);
+			bestParticleIndex = -1;
+		}
+
+		//参数[随机系数]初始化
+//		particleUpdate.begin(this);
+
+		for (int particleIndex = 0; particleIndex < particles.length; particleIndex++) {
+			
+			/**------------------------------------------------------------------------------------------
+			 * ------------------------------------------------------------------------------------------
+			 * -----------------------Evaluate each particle (and find the 'best' one)-------------------
+			 * ------------------------------------------------------------------------------------------
+			 * ------------------------------------------------------------------------------------------
+			 */
+			//计算粒子在当前位置【放置方案】下的负载值
+			double fit_LoadDegree = fitnessFunction.evaluate(particles[particleIndex]);
+
+			// Update 'best global' position
+			//获取群体的最优值,粒子的当前值比粒子群的最优值好，进行更新
+			/**
+			 * --------------------全局更新--------------------------------
+			 */
+			if (fitnessFunction.isBetterThan(bestFitness, fit_LoadDegree)
+			/* &&fitnessFunction.LoadDegree_isBetterThan(bestFitness, fit_NumOfPm)*/  ) {
+				bestFitness = fit_LoadDegree; // Copy best fitness, index, and position vector
+				bestParticleIndex = particleIndex;
+				
+				//更新最优位置
+				if (bestPosition == null) 
+					bestPosition = new int[sampleParticle.getDimension()];
+//				particles[bestParticleIndex].copyPosition(bestPosition);
+				copyFrom2To(particles[bestParticleIndex].position,this.bestPosition);
+				
+				//当前最优速度值进行拷贝
+				copyFrom2To(particles[particleIndex].velocity,this.getGlobalBestVelocity());
+				
+				//更新最优部署位置
+				this.bestDeployMap=particles[bestParticleIndex].getDeployMap();
+				
+				//跟新虚拟机映射的物理机下标
+				this.best_vm_pm_map_Array=particles[bestParticleIndex].getVm_map_pm_index();
+				
+				//更新最优放置情况下的物理机剩余资源量
+				this.bestSet=particles[particleIndex].getPhysicalMachine();
+				
+//				System.out.println("当前数据中心负载不均衡度值= "+bestFitness);
+//				System.out.println("------------当前虚拟机映射物理机位置--------");
+//				Utils.printIntArray(best_vm_pm_map_Array);
+			
+			}
+			
+			/**
+			 * --------------------局部更新--------------------------------
+			 */
+			//粒子的局部最优适应度值和局部最优位置进行更新
+			if(fitnessFunction.isBetterThan(particles[particleIndex].getlocalFitness(), fit_LoadDegree)){
+				particles[particleIndex].setlocalFitness(fit_LoadDegree);
+				particles[particleIndex].setBestVelocity(particles[particleIndex].velocity);
+				particles[particleIndex].setBestPosition(particles[particleIndex].getPosition());
+			}
+			
+			/**
+			 * 算法思想来自论文 【已下载】
+			 * A New Particle Swarm Optimization Algorithm with Random Inertia Weight and Evolution Strategy
+			 */
+			this.inertia=InertiaValue(particleIndex, iterNum,this.numberOfIterations, this.averageFitnesses);
+//			System.out.println(this.inertia);
+			
+	       /**------------------------------------------------------------------------------------------
+	        * ------------------------------------------------------------------------------------------
+	        * Update every particle's position and velocity, also apply position and velocity constraints (if any)
+	        * Warning: Particles must be already evaluated
+	        * ------------------------------------------------------------------------------------------
+	        * ------------------------------------------------------------------------------------------
+	        */
+			//
+			
+			//这个地方使用对0-1向量进行计算的算子进行
+			particleUpdate.update(this, particles[particleIndex],curr_temp);
+			//使用模拟退火算法进行位置更新
+		}
+		
+		// Finish a particle update iteration
+		particleUpdate.end(this);
+	}
+	
+	/**【别人创新点】
+	 * 来自论文: 
+	 *     A new particle swarm optimization algorithm with random inertia weight and evolution strategy
+	 * @param particleNumber 粒子的编号
+	 * @param iterNumber     当前迭代代数
+	 * @param numberOfIterations  最大迭代代数
+	 * @param averageFitnesses    平均的适应度值
+	 * @return 惯性权重  
+	 */
+    double InertiaValue(int particleNumber, int iterNumber,int numberOfIterations, ArrayList<double[]> averageFitnesses){
+		
+		int k =5;
+		double w = 0.0;
+		
+		/**
+		 * 在Swarm中，默认值设置为0.9,这里让其在0.8-1之间进行浮动；
+		 * w的相对大小会左右粒子群的全局搜索和局部搜索的能力
+		 */
+		double w_max = 1;
+		double w_min = 0.8;
+		
+		double t_max = numberOfIterations;
+		double t = iterNumber;
+		
+		Random  seed =new Random();
+		//if t is multiple of k; 使用根据模拟退火算法算出的概率所决定的惯性权重
+		if (t % k == 0 && t != 0) {
+		     
+			//annealing probability
+			double p = 0;
+					
+			double currentFitness = averageFitnesses.get(particleNumber)[iterNumber];
+			double previousFitness = averageFitnesses.get(particleNumber)[iterNumber - k];
+			
+			//下面是退火概率的计算公式
+			if(previousFitness <= currentFitness){
+				p = 1;
+			}
+			
+			else{
+				//annealing temperature
+				double coolingTemp_Tt = 0.0;
+				
+				Particle currParticle = particles[particleNumber];
+				double bestFitness = currParticle.getlocalFitness();
+				
+				double ParticleFitnessAverage = 0;
+				
+				int counter = 0;
+				for(int i = 0 ; i < iterNumber ; i++){
+					if(averageFitnesses.get(particleNumber)[i] > 0){
+						ParticleFitnessAverage += averageFitnesses.get(particleNumber)[i];
+						counter++;
+					}
+				}
+				
+				// calculate the average fitness value of the the current iteration
+				ParticleFitnessAverage = ParticleFitnessAverage/counter;
+				
+				//calculate the next adaptive cooling temperature:
+				coolingTemp_Tt = (ParticleFitnessAverage / bestFitness) - 1;
+				
+				//calculate the simulated annealing probability
+				p = Math.exp(-(previousFitness - currentFitness)/coolingTemp_Tt);
+				
+			}	
+			
+			//random is random number uniformity distributing in range [0,1]
+			int random = seed.nextInt(2);
+			
+			//new inertia weight，模拟退火计算出的概率
+			if(p >= random){
+				w = 1 + random/2;				
+			}
+			
+			else{
+				w = 0 + random/2;
+			}
+		}
+		
+		//if t is not multiple of k; 使用一般的动态的惯性权重
+		else{
+			double w_fraction = ( w_max - w_min ) * ( t_max - t ) / t_max;
+			w = w_max - w_fraction;
+		}
+		return w;
+	}
+    
+    
+	
+
+	public double getBestFitness() {
+		return bestFitness;
+	}
+
+	public Particle getBestParticle() {
+		return particles[bestParticleIndex];
+	}
+
+	public int getBestParticleIndex() {
+		return bestParticleIndex;
+	}
+
+	public int[] getBestPosition() {
+		return bestPosition;
+	}
+
+	public FitnessFunction getFitnessFunction() {
+		return fitnessFunction;
+	}
+
+	public double getGlobalIncrement() {
+		return globalIncrement;
+	}
+
+	public double getInertia() {
+		return inertia;
+	}
+
+	public int getNumberOfEvaliations() {
+		return numberOfEvaliations;
+	}
+
+	public int getNumberOfParticles() {
+		return numberOfParticles;
+	}
+
+	public Particle getParticle(int i) {
+		return particles[i];
+	}
+
+	public double getParticleIncrement() {
+		return particleIncrement;
+	}
+
+	public Particle[] getParticles() {
+		return particles;
+	}
+
+	public ParticleUpdate getParticleUpdate() {
+		return particleUpdate;
+	}
+
+	public Particle getSampleParticle() {
+		return sampleParticle;
+	}
+
+	
+	/**
+	 * Iterate over all particles
+	 */
+	public Iterator<Particle> iterator() {
+		if (particlesList == null) {
+			particlesList = new ArrayList<Particle>(particles.length);
+			for (int i = 0; i < particles.length; i++)
+				particlesList.add(particles[i]);
+		}
+
+		return particlesList.iterator();
+	}
+
+	public void setBestParticleIndex(int bestParticle) {
+		bestParticleIndex = bestParticle;
+	}
+
+	public void setBestPosition(int[] bestPosition) {
+		this.bestPosition = bestPosition;
+	}
+
+	public void setFitnessFunction(FitnessFunction fitnessFunction) {
+		this.fitnessFunction = fitnessFunction;
+	}
+
+	public void setGlobalIncrement(double globalIncrement) {
+		this.globalIncrement = globalIncrement;
+	}
+
+	public void setInertia(double inertia) {
+		this.inertia = inertia;
+	}
+
+	public void setNumberOfEvaliations(int numberOfEvaliations) {
+		this.numberOfEvaliations = numberOfEvaliations;
+	}
+
+	public void setNumberOfParticles(int numberOfParticles) {
+		this.numberOfParticles = numberOfParticles;
+	}
+
+	public void setParticleIncrement(double particleIncrement) {
+		this.particleIncrement = particleIncrement;
+	}
+
+	public void setParticles(Particle[] particle) {
+		particles = particle;
+		particlesList = null;
+	}
+
+	public void setParticleUpdate(ParticleUpdate particleUpdate) {
+		this.particleUpdate = particleUpdate;
+	}
+
+	public void setSampleParticle(Particle sampleParticle) {
+		this.sampleParticle = sampleParticle;
+	}
+
+	public int[] getGlobalBestVelocity() {
+		return globalBestVelocity;
+	}
+
+	public void setGlobalBestVelocity(int[] globalBestVelocity) {
+		this.globalBestVelocity = globalBestVelocity;
+	}
+	
+	
+
+	public int[] getBest_vm_pm_map_Array() {
+		return best_vm_pm_map_Array;
+	}
+
+	public void setBest_vm_pm_map_Array(int[] best_vm_pm_map_Array) {
+		this.best_vm_pm_map_Array = best_vm_pm_map_Array;
+	}
+
+	/** Swarm size (number of particles) */
+	public int size() {
+		return particles.length;
+	}
+
+	/**
+	 * Return a string with some (very basic) statistics 
+	 * @return A string
+	 */
+	public String toStringStats() {
+		System.out.println("\n-----------------部署如下----------------------");
+		String stats = "";
+		stats+="NumOfPhysicalMachine="+this.physicalMachine.length+"  |   ";
+		stats+="NumOfVirtualMachine="+this.virtualMachine.length+"\n\n";
+		if (!Double.isNaN(bestFitness)) {
+			stats += "Best fitness: " + bestFitness + "\nBest position: \t[";
+			for (int i = 0; i < bestPosition.length; i++)
+				stats += bestPosition[i] + (i < (bestPosition.length-1) ? " " : "]");
+		}
+        //获取部署映射
+		stats+="\n\n------------Best DeployMap Follows-------------------\n";
+		for(Entry<Integer, Vector<Integer>> entry:this.bestDeployMap.entrySet()){
+			Integer key=entry.getKey();
+			Vector<Integer>value=entry.getValue();
+			stats+="pm_index="+key+"================"+"vm_index_set=";
+			stats+=value+"\n";
+		}
+		
+//		stats+="\n\n------------Remaining PhysicalMachine Resource---------------------\n";
+//		for(int index=0;index<this.bestSet.length;index++){
+//			stats+=this.bestSet[index].toString()+"\n";
+//		}
+		return stats;
+	}
+	
+	public void printResult(){
+		 double loaddegree=this.getBestFitness();
+		 System.out.println("\nloadDegree="+loaddegree+"\n");
+		 
+		 //数据中心的资源利用率
+//		 Utils.printUtilInfo(this.physicalMachine, this.getBestParticle().getPhysicalMachine());
+		 
+		 System.out.println("----------------------------DeployMap----------------------------------");
+		 for(Entry<Integer, Vector<Integer>> entry:this.bestDeployMap.entrySet()){
+			Integer key1=entry.getKey();
+			Vector<Integer>value1=entry.getValue();
+			 System.out.println("pm_index="+key1+"================"+"vm_index_set="+value1.toString());
+		}
+	 
+//		 System.out.println("----------------------------best_vm_pm_map_Array----------------------------------");
+//		 int count=0;
+//		 for(int lee:this.getBest_vm_pm_map_Array()){
+//			 System.out.print(lee+" ");
+//			 count++;
+//			 if(count%20==0)
+//				 System.out.println();
+//		 }
+		 
+		 //每台物理机的资源利用率
+//     double [][] utilMatrix=Utils.utilityForAllPhysicalMachine(this.getBestParticle().origin_pm, this.getBestParticle().getPhysicalMachine());
+//	   Utils.printDoubleMatrix(utilMatrix);	 
+	}
+	
+	public void copyFrom2To(int []from,int []to){
+		int index,size;
+		size=from.length;
+		for(index=0;index<size;index++){
+			to[index]=from[index];
+		}
+	}
+	
+	
+}

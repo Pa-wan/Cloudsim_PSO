@@ -1,0 +1,284 @@
+package org.cloudbus.cloudsim.hust.acopso;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Random;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.hust.aco.Utils;
+import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
+import org.cloudbus.cloudsim.policy.utils.ExtHelper;
+
+public class Particle {
+	private List<Vm> vmList;//虚拟机列表
+	private List<Host> hostList;//物理机列表
+	private double[] pos ; // 粒子的位置
+	private double[] pbest ; // 粒子本身的最优位置
+	private double[] v ; // 粒子的速度
+	private Map<String,ArrayList<Host>> allowed;//物理机候选表
+	private double banlanceDegree;//总体不均衡度
+	private int bestLoad;//最佳负载区间物理机数量
+	public double bestfitness; //粒子本身的最优解
+	private Map<String,Integer> vmTohost;//每个粒子每次循环输出一个方案
+	
+	private double util[][];//利用率矩阵
+	private double utilAvg[];//单个物理机平均利用率向量
+	private double outerStd;//外部方差和
+	private double innerStd;//内部方差和
+	private Map<Integer,Long> storageMap;//物理机固有的存储，Host类中不保存该值
+	private Map<Integer,Host> hostById;
+	private Map<String,Vm> vmByUid;
+	private double w;
+	private double c1 ;
+	private double c2 ;
+	private int t=0;
+	
+	public Particle(List<Vm> vms,List<Host> hosts){
+		bestfitness=Double.MAX_VALUE;
+		pos= new double[vms.size()];
+		pbest= new double[vms.size()];
+		v= new double[vms.size()];
+		hostList=ExtHelper.createHostList(hosts.size()); //创建物理机
+		vmList = ExtHelper.createVmList(Main.brokerId,vms.size());
+		vmTohost=new HashMap<String, Integer>();
+		allowed=new HashMap<String,ArrayList<Host>>();
+		
+		storageMap=new HashMap<Integer, Long>();
+		hostById=new HashMap<Integer, Host>();
+		vmByUid=new HashMap<String, Vm>();
+		for(Host host:hostList){
+			storageMap.put(host.getId(), host.getStorage());
+			hostById.put(host.getId(), host);
+		}
+		for(Vm vm:vmList){
+			vmByUid.put(vm.getUid(), vm);
+		}
+		
+		util=new double[hostList.size()][4];
+		utilAvg=new double[hostList.size()];
+	}
+	
+	public void init(Map<String,ArrayList<Host>> allowe,Map<String,Integer> vmTohost){
+		banlanceDegree=0;
+		bestLoad=0;
+		outerStd=0;
+		innerStd=0;
+		
+		for(Vm vm:vmList){                        //每台虚拟机的物理机候选表副本
+			ArrayList<Host>  temp=new ArrayList<Host>();
+			for(Host host:allowe.get(vm.getUid())){
+				temp.add(hostById.get(host.getId()));//此处添加副本
+			}
+			allowed.put(vm.getUid(), temp);
+		}
+		
+//		for(Vm vm:vmList){
+//			ArrayList<Host> temphosts=allowed.get(vm.getUid());
+//			if(temphosts.size()!=0){//虚拟机有可选物理机
+//				Random random=new Random();
+//				int idx=random.nextInt(temphosts.size());
+//				Host host=temphosts.get(idx);
+//				pos[vm.getId()]=idx;//初始化位置
+//				while(!Utils.isSuitable(vm, host)){
+//					pos[vm.getId()]=((int)pos[vm.getId()]+1)%temphosts.size();
+//					host=temphosts.get((int)pos[vm.getId()]);
+//				}
+//				pbest[vm.getId()]=pos[vm.getId()];
+//				v[vm.getId()]=random.nextInt(temphosts.size())-pos[vm.getId()];//初始化速度
+//				vmTohost.put(vm.getUid(), host.getId());//记录放置方案
+//				updateResource(vm, host);//更新可用资源
+//			}
+//		}
+		
+		Iterator<Entry<String,Integer>> it=vmTohost.entrySet().iterator();
+		Random random=new Random();
+		while(it.hasNext()){
+			Entry<String,Integer> entry=it.next();
+			Host host=hostById.get(entry.getValue());
+			Vm vm=vmByUid.get(entry.getKey());
+			pos[vm.getId()]=allowed.get(vm.getUid()).indexOf(host);
+			v[vm.getId()]=random.nextInt(allowed.get(vm.getUid()).size())-pos[vm.getId()];//初始化速度
+			pbest[vm.getId()]=pos[vm.getId()];
+			updateResource(vm, host);//更新可用资源
+		}
+		calcuMd();
+		
+	}
+	
+	/**
+	 * 将vm分配的资源返还到host,为下次循环准备，主要目的在于每只蚂蚁只分配一次vmList,hostList防止堆溢出
+	 */
+	private void reset(){
+		banlanceDegree=0;
+		bestLoad=0;
+		outerStd=0;
+		innerStd=0;
+		
+		vmTohost.clear();
+		for(Host host:hostList){
+			host.vmDestroyAll();
+		}
+		for(Vm vm:vmList){
+			vm.setCurrentAllocatedBw(0);
+			vm.setCurrentAllocatedMips(null);
+			vm.setCurrentAllocatedRam(0);
+			vm.setCurrentAllocatedSize(0);
+		}
+	}
+
+	/**
+	 * 产生问题的可行解，并计算该解的度量指标
+	 */
+	public void run(){
+		reset();
+		updatePos();
+		calcuMd();
+	}
+	
+	private void updateResource(Vm vm, Host host) {
+		host.vmCreate(vm);//更新资源，CurrentAllocatedMips,CurrentAllocatedSize
+		vm.setCurrentAllocatedSize(vm.getSize());
+		List<Double> list=new ArrayList<Double>();
+		list.add(vm.getCurrentRequestedTotalMips());
+		vm.setCurrentAllocatedMips(list);
+	}
+	
+	/**
+	 * 计算总体均衡程度
+	 */
+	private void calcuMd(){
+		double[] std=new double[hostList.size()];
+		double avg[]=new double[4];
+		double sumCpu=0,sumMem=0,sumBw=0,sumStorage=0;
+		
+		for(Host host:hostList){
+			double temp=0;
+			util[host.getId()][0]=(host.getTotalMips()-host.getAvailableMips())/host.getTotalMips();
+			util[host.getId()][1]=host.getRamProvisioner().getUsedRam()/(host.getRam()+0.0);
+			util[host.getId()][2]=host.getBwProvisioner().getUsedBw()/(host.getBw()+0.0);
+			util[host.getId()][3]=(storageMap.get(host.getId())-host.getStorage())/(storageMap.get(host.getId())+0.0);
+			
+			sumCpu+=util[host.getId()][0];
+			sumMem+=util[host.getId()][1];
+			sumBw+=util[host.getId()][2];
+			sumStorage+=util[host.getId()][3];
+			
+			boolean flag=false;
+			for(int i=0;i<4;i++){
+				if(!(util[host.getId()][i]<=0.9&&util[host.getId()][i]>=0.1)){
+					flag=true;
+					break;
+				}
+			}
+			if(!flag){
+				bestLoad++;
+			}
+			utilAvg[host.getId()]=(util[host.getId()][0]+util[host.getId()][1]+util[host.getId()][2]+util[host.getId()][3])/4;
+			for(int i=0;i<4;i++){
+				temp+=Math.pow(util[host.getId()][i]-utilAvg[host.getId()], 2);
+			}
+			std[host.getId()]=Math.sqrt(temp/4);
+			innerStd+=std[host.getId()];
+		}
+		
+		avg[0]=sumCpu/(hostList.size());
+		avg[1]=sumMem/(hostList.size());
+		avg[2]=sumBw/(hostList.size());
+		avg[3]=sumStorage/(hostList.size());
+		for(Host host:hostList){
+			double temp=0;
+			for(int i=0;i<4;i++){
+				//temp+=Math.pow(util[host.getId()][i]-avg[i], 2);
+				temp+=Math.abs(util[host.getId()][i]-avg[i]);
+			}
+			//outerStd+=Math.sqrt(temp);
+			outerStd+=temp;
+		}
+		//banlanceDegree=(innerStd+outerStd)/hostList.size();//改进评价指标，引入内部资源方差
+		banlanceDegree=outerStd/hostList.size();
+		
+		if (banlanceDegree < bestfitness) {//更新粒子自身最优位置
+			bestfitness = banlanceDegree;
+			for (Vm vm:vmList) {
+				pbest[vm.getId()] = pos[vm.getId()];
+			}
+		}
+	}
+	
+	/**
+	 * 在每次循环结束时，先调用reset方法，后调用updatePos方法
+	 */
+	private void updatePos() {//更新位置和速度
+		Random random=new Random();
+		//int a=t++;
+		int a=1;
+		w=0.4+0.4/PSO.MAX_GEN*a;
+		c1=c2=0.8-0.4/PSO.MAX_GEN*a;
+		for(Vm vm:vmList){
+			ArrayList<Host> temphosts=allowed.get(vm.getUid());
+			int size=temphosts.size();
+			v[vm.getId()] = w * v[vm.getId()] + c1 * random.nextDouble()
+					* (pbest[vm.getId()] - pos[vm.getId()]) + c2 * random.nextDouble()
+					* (PSO.gbest[vm.getId()] - pos[vm.getId()]);//gbest在主程序PSO中比较获得
+			if(v[vm.getId()]>size-1-pos[vm.getId()])//修正速度
+				v[vm.getId()]=size-1-pos[vm.getId()];
+			else if(v[vm.getId()]<-pos[vm.getId()])
+				v[vm.getId()]=-pos[vm.getId()];
+			
+			pos[vm.getId()] =pos[vm.getId()] + v[vm.getId()];
+			if(pos[vm.getId()]>size-1)//修正位置
+				pos[vm.getId()]=size-1;
+			else if(pos[vm.getId()]<0)
+				pos[vm.getId()]=0;
+			
+			pos[vm.getId()]=(int)pos[vm.getId()];
+			Host host=temphosts.get((int)pos[vm.getId()]);
+			while(!Utils.isSuitable(vm, host)){
+				pos[vm.getId()]=((int)pos[vm.getId()]+1)%temphosts.size();
+				host=temphosts.get((int)pos[vm.getId()]);
+			}
+			vmTohost.put(vm.getUid(), host.getId());//记录放置方案
+			updateResource(vm, host);//更新可用资源
+		}
+	}
+
+	public double getBanlanceDegree() {
+		return banlanceDegree;
+	}
+
+	public void setBanlanceDegree(double banlanceDegree) {
+		this.banlanceDegree = banlanceDegree;
+	}
+
+	public double[] getPos() {
+		return pos;
+	}
+
+	public void setPos(double[] pos) {
+		this.pos = pos;
+	}
+
+	public Map<String, Integer> getVmTohost() {
+		return vmTohost;
+	}
+
+	public void setVmTohost(Map<String, Integer> vmTohost) {
+		this.vmTohost = vmTohost;
+	}
+
+	public int getBestLoad() {
+		return bestLoad;
+	}
+
+	public void setBestLoad(int bestLoad) {
+		this.bestLoad = bestLoad;
+	}
+	
+	
+
+}

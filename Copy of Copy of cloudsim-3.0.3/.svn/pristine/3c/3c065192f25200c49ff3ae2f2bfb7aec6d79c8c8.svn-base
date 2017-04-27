@@ -1,0 +1,169 @@
+package org.cloudbus.cloudsim.ui;
+
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Dialog;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Text;
+import org.eclipse.swt.widgets.Tree;
+import org.eclipse.swt.widgets.TreeItem;
+import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Group;
+import org.eclipse.swt.widgets.Spinner;
+import org.eclipse.swt.widgets.Scale;
+
+public class UserFrame extends Dialog {
+
+	protected Object result;
+	protected Shell shell;
+	private Label lblNewLabel ;
+	private Label lblNewLabel_1;
+	private Text text;
+	private Text text_1;
+	private Button button;
+	private Label lblCpu ;
+	private Group group;
+	/**
+	 * Create the dialog.
+	 * @param parent
+	 * @param style
+	 */
+	public UserFrame(Shell parent, int style) {
+		super(parent, style);
+		setText("SWT Dialog");
+	}
+
+	/**
+	 * Open the dialog.
+	 * @return the result
+	 */
+	public Object open() {
+		createContents();
+		shell.open();
+		shell.layout();
+		Display display = getParent().getDisplay();
+		while (!shell.isDisposed()) {
+			if (!display.readAndDispatch()) {
+				display.sleep();
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Create contents of the dialog.
+	 */
+	private void createContents() {
+		shell = new Shell(getParent(), getStyle());
+		shell.setText("用户管理");
+		shell.setSize(682, 472);
+		
+		SashForm sashForm = new SashForm(shell, SWT.NONE);
+		sashForm.setBounds(10, 10, 656, 424);
+		
+		final Tree tree = new Tree(sashForm, SWT.BORDER);
+		final TreeItem treeItem = new TreeItem(tree, SWT.NONE);
+		treeItem.setText("用户信息");
+		
+		final TreeItem treeItem_1 = new TreeItem(tree, SWT.NONE);
+		treeItem_1.setText("资源申请");
+		
+		final TreeItem treeItem_2 = new TreeItem(tree, SWT.NONE);
+		treeItem_2.setText("资源监控");
+		final Composite composite = new Composite(sashForm, SWT.NONE);
+		
+		tree.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				TreeItem[] treeItems=tree.getSelection();
+				//System.out.println(treeItems[0].getText());
+				if(treeItems[0]==treeItem){
+					lblNewLabel = new Label(composite, SWT.NONE);
+					lblNewLabel.setBounds(63, 55, 61, 17);
+					lblNewLabel.setText("用户名：");
+					
+					text= new Text(composite, SWT.BORDER);
+					text.setBounds(130, 52, 73, 23);
+					
+					lblNewLabel_1 = new Label(composite, SWT.NONE);
+					lblNewLabel_1.setBounds(63, 93, 61, 17);
+					lblNewLabel_1.setText("密   码：");
+					
+					text_1 = new Text(composite, SWT.BORDER);
+					text_1.setBounds(130, 87, 73, 23);
+					
+					button = new Button(composite, SWT.NONE);
+					button.setBounds(240, 87, 80, 27);
+					button.setText("修改");
+					
+					lblNewLabel.setVisible(true);
+					lblNewLabel_1.setVisible(true);
+					text.setVisible(true);
+					text_1.setVisible(true);
+					button.setVisible(true);
+					
+				}else if(treeItems[0]==treeItem_1){
+					lblNewLabel.setVisible(false);
+					lblNewLabel_1.setVisible(false);
+					text.setVisible(false);
+					text_1.setVisible(false);
+					button.setVisible(false);
+					
+					group = new Group(composite, SWT.NONE);
+					group.setText("虚拟机申请");
+					group.setBounds(10, 10, 470, 404);
+					
+					lblCpu = new Label(group, SWT.NONE);
+					lblCpu.setBounds(10, 38, 61, 17);
+					lblCpu.setText("CPU：");
+					
+					Spinner spinner = new Spinner(group, SWT.BORDER);
+					spinner.setBounds(78, 35, 47, 23);
+					
+					Label lblNewLabel_2 = new Label(group, SWT.NONE);
+					lblNewLabel_2.setBounds(131, 38, 61, 17);
+					lblNewLabel_2.setText("核");
+					
+					Label label = new Label(group, SWT.NONE);
+					label.setBounds(10, 76, 61, 17);
+					label.setText("内存：");
+					
+					Scale scale = new Scale(group, SWT.NONE);
+					scale.setBounds(78, 64, 170, 42);
+					
+					Label label_1 = new Label(group, SWT.NONE);
+					label_1.setBounds(10, 126, 61, 17);
+					label_1.setText("带宽：");
+					
+					Scale scale_1 = new Scale(group, SWT.NONE);
+					scale_1.setBounds(78, 112, 170, 42);
+					
+					Label label_2 = new Label(group, SWT.NONE);
+					label_2.setBounds(10, 182, 61, 17);
+					label_2.setText("存储：");
+					
+					Spinner spinner_1 = new Spinner(group, SWT.BORDER);
+					spinner_1.setBounds(78, 176, 47, 23);
+					
+					Label lblGb = new Label(group, SWT.NONE);
+					lblGb.setBounds(131, 182, 61, 17);
+					lblGb.setText("GB");
+				}else{
+					lblNewLabel.setVisible(false);
+					lblNewLabel_1.setVisible(false);
+					text.setVisible(false);
+					text_1.setVisible(false);
+					button.setVisible(false);
+				}
+			}
+		});
+		sashForm.setWeights(new int[] {1, 3});
+	}
+	
+	
+}

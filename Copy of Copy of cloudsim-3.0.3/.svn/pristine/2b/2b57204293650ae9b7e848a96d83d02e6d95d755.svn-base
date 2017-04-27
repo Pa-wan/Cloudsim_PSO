@@ -1,0 +1,213 @@
+package org.cloudbus.cloudsim.hust.aco;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+
+public class Utils {
+	/**
+	 * 虚拟机全部放置完成，request量会变为0，需要使用原始量
+	 * 
+	 * @param vm
+	 * @param host
+	 * @return
+	 */
+	public static boolean isSuitable(Vm vm, Host host) {
+		if ((vm.getNumberOfPes() * vm.getMips()) <= host.getAvailableMips()
+				&& vm.getRam() <= host.getRamProvisioner().getAvailableRam()
+				&& vm.getSize() <= host.getStorage()
+				&& vm.getBw() <= host.getBwProvisioner().getAvailableBw())
+			return true;
+
+		return false;
+	}
+
+	/**
+	 * 分配全部请求资源
+	 * 
+	 * @param vm
+	 */
+	public static void updateVmResource(Vm vm) {
+		vm.setCurrentAllocatedSize(vm.getSize());
+		List<Double> list = new ArrayList<Double>();
+		list.add(vm.getNumberOfPes() * vm.getMips());
+		vm.setCurrentAllocatedMips(list);
+		vm.setCurrentAllocatedBw(vm.getBw());
+		vm.setCurrentAllocatedRam(vm.getRam());
+	}
+
+	/**
+	 * 分配资源复位
+	 * 
+	 * @param vm
+	 */
+	public static void resetVmResource(Vm vm) {
+		vm.setCurrentAllocatedBw(0);
+		vm.setCurrentAllocatedMips(null);
+		vm.setCurrentAllocatedRam(0);
+		vm.setCurrentAllocatedSize(0);
+	}
+
+	/*
+	 * public static double calcuDistance(Vm vm, Host host) { //向量夹角余弦 double
+	 * sum=host.getAvailableMips()*vm.getCurrentRequestedTotalMips()+
+	 * host.getRamProvisioner().getAvailableRam()
+	 * 
+	 * vm.getCurrentRequestedRam()+ host.getStorage()*vm.getSize()+
+	 * host.getBwProvisioner().getAvailableBw()
+	 * 
+	 * vm.getCurrentRequestedBw();
+	 * 
+	 * double sum1=Math.sqrt(Math.pow(host.getAvailableMips(), 2)+
+	 * Math.pow(host.getRamProvisioner().getAvailableRam(), 2)+
+	 * Math.pow(host.getStorage(), 2)+Math.pow(host.getBwProvisioner
+	 * 
+	 * ().getAvailableBw(), 2));
+	 * 
+	 * double sum2=Math.sqrt(Math.pow(vm.getCurrentRequestedTotalMips(), 2)+
+	 * Math.pow(vm.getCurrentRequestedRam(), 2)+ Math.pow(vm.getSize(),
+	 * 2)+Math.pow(vm.getCurrentRequestedBw(), 2));
+	 * 
+	 * return sum/sum1/sum2;
+	 * 
+	 * }
+	 */
+
+	/**
+	 * 利用百分比率作为标准，而非绝对数值，结果要比上述好，时间会变长
+	 * 
+	 * @param vm
+	 * @param host
+	 * @return
+	 */
+	public static double calcuDistance(Vm vm, Host host) {
+		// 向量夹角余弦
+		double sum = host.getAvailableMips() * vm.getCurrentRequestedTotalMips() / Math.pow(host.getTotalMips(), 2)
+				+ host.getRamProvisioner().getAvailableRam()* vm.getCurrentRequestedRam() / Math.pow(host.getRam(), 2)
+				+ host.getStorage() * vm.getSize()/ Math.pow(ACO.storageMap.get(host.getId()), 2) 
+				+ host.getBwProvisioner().getAvailableBw()* vm.getCurrentRequestedBw() / Math.pow(host.getBw(), 2);
+
+		double sum1 = Math.sqrt(Math.pow(host.getAvailableMips() / (host.getTotalMips() + 0.0), 2)
+				+ Math.pow(host.getRamProvisioner().getAvailableRam() / (host.getRam() + 0.0), 2)
+				+ Math.pow(host.getStorage() / (ACO.storageMap.get(host.getId()) + 0.0), 2)
+				+ Math.pow(host.getBwProvisioner().getAvailableBw() /(host.getBw() + 0.0), 2));
+
+		double sum2 = Math.sqrt(Math.pow(vm.getCurrentRequestedTotalMips() /(host.getTotalMips() + 0.0), 2) 
+				+ Math.pow(vm.getCurrentRequestedRam() / (host.getRam() + 0.0), 2)
+				+ Math.pow(vm.getSize() / (ACO.storageMap.get(host.getId()) + 0.0), 2)
+				+ Math.pow(vm.getCurrentRequestedBw() / (host.getBw() + 0.0), 2));
+
+		return sum / sum1 / sum2;
+
+	}
+
+	/**
+	 * 利用百分比率作为标准，而非绝对数值,动态迁移阶段利用实时数据
+	 * 
+	 * @param vm
+	 * @param host
+	 * @return
+	 */
+	public static double calcuFactor(Vm vm, Host host, double[] hostAvaiable) {
+		// 向量夹角余弦
+		double sum = hostAvaiable[0] * vm.getCurrentAllocatedMips().get(0)/ Math.pow(host.getTotalMips(), 2) 
+				+ hostAvaiable[1]* vm.getCurrentAllocatedRam() / Math.pow(host.getRam(), 2)
+				+ hostAvaiable[2]* vm.getCurrentAllocatedBw() / Math.pow(host.getBw	(), 2) 
+				+ hostAvaiable[3] * vm.getCurrentAllocatedSize()/ Math.pow(ACO.storageMap.get(host.getId()), 2);
+
+		double sum1 = Math.sqrt(Math.pow(hostAvaiable[0]/ (host.getTotalMips() + 0.0),2)
+				+ Math.pow(hostAvaiable[1] /(host.getRam() + 0.0), 2) 
+				+ Math.pow(hostAvaiable[2] /(host.getBw() + 0.0), 2) 
+				+ Math.pow(hostAvaiable[3] /(ACO.storageMap.get(host.getId()) + 0.0), 2));
+
+		double sum2 = Math.sqrt(Math.pow(vm.getCurrentAllocatedMips().get(0) /(host.getTotalMips() + 0.0), 2)
+				+ Math.pow(vm.getCurrentAllocatedRam() / (host.getRam() + 0.0), 2)
+				+ Math.pow(vm.getCurrentAllocatedBw() / (host.getBw() + 0.0), 2)
+				+ Math.pow(vm.getCurrentAllocatedSize()	/ (ACO.storageMap.get(host.getId()) + 0.0), 2));
+
+		return sum / sum1 / sum2;
+
+	}
+
+	/**
+	 * 不重复的随机数列
+	 * 
+	 * @param total
+	 * @return
+	 */
+	public static int[] getRandomSequence(int total) {
+		int[] sequence = new int[total];
+		int[] output = new int[total];
+
+		for (int i = 0; i < total; i++) {
+			sequence[i] = i;
+		}
+		Random random = new Random();
+		int end = total - 1;
+
+		for (int i = 0; i < total; i++) {
+			int num = random.nextInt(end + 1);
+			output[i] = sequence[num];
+			sequence[num] = sequence[end];
+			end--;
+		}
+		return output;
+	}
+
+	public static int partion(List<Map.Entry<Host, Double>> list, int left,
+			int right) {
+		Map.Entry<Host, Double> pivot = list.get(left);
+		while (left < right) {
+			while (left < right && list.get(right).getValue() <=
+
+			pivot.getValue())
+				right--;
+
+			list.set(left, list.get(right));
+
+			while (left < right && list.get(left).getValue() >=
+
+			pivot.getValue())
+				left++;
+
+			list.set(right, list.get(left));
+		}
+		list.set(left, pivot);
+		return left;
+	}
+
+	public static void getTopKMax(List<Map.Entry<Host, Double>> list,
+			int first, int
+
+			end, int k) {
+		if (first < end) {
+			int partionIndex = partion(list, first, end);
+			if (partionIndex == k - 1)
+				return;
+			else if (partionIndex > k - 1)
+				getTopKMax(list, first, partionIndex - 1, k);
+			else
+				getTopKMax(list, partionIndex + 1, end, k);
+		}
+	}
+
+	/*
+	 * public static Host deepCopy(Host src) throws Exception{
+	 * ByteArrayOutputStream bo = new ByteArrayOutputStream();
+	 * ObjectOutputStream oo = new ObjectOutputStream(bo); oo.writeObject(src);
+	 * ByteArrayInputStream bi = new ByteArrayInputStream(bo.toByteArray());
+	 * ObjectInputStream oi = new ObjectInputStream(bi); Host
+	 * dis=(Host)oi.readObject(); return dis; }
+	 * 
+	 * public static Vm deepCopy(Vm src) throws Exception{ ByteArrayOutputStream
+	 * bo = new ByteArrayOutputStream(); ObjectOutputStream oo = new
+	 * ObjectOutputStream(bo); oo.writeObject(src); ByteArrayInputStream bi =
+	 * new ByteArrayInputStream(bo.toByteArray()); ObjectInputStream oi = new
+	 * ObjectInputStream(bi); Vm dis=(Vm)oi.readObject(); return dis; }
+	 */
+
+}

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="examples"/>
+	<classpathentry kind="src" path="sources"/>
+	<classpathentry kind="lib" path="jars/cloudsim-3.0.3-sources.jar"/>
+	<classpathentry kind="lib" path="jars/cloudsim-3.0.3.jar"/>
+	<classpathentry kind="lib" path="jars/cloudsim-examples-3.0.3-sources.jar"/>
+	<classpathentry kind="lib" path="jars/cloudsim-examples-3.0.3.jar"/>
+	<classpathentry kind="lib" path="jars/OpenForecast-0.5.0-src.jar"/>
+	<classpathentry kind="lib" path="jars/OpenForecast-0.5.0.jar" sourcepath="E:/MyEclipse 10/cloudsim-3.0.3/jars/OpenForecast-0.5.0-src.jar"/>
+	<classpathentry kind="lib" path="jars/commons-math3-3.0.jar"/>
+	<classpathentry kind="lib" path="jars/org.eclipse.core.commands_3.6.0.I20110111-0800.jar"/>
+	<classpathentry kind="lib" path="jars/org.eclipse.core.runtime_3.7.0.v20110110.jar"/>
+	<classpathentry kind="lib" path="jars/org.eclipse.core.runtime.compatibility_3.2.100.v20100505.jar"/>
+	<classpathentry kind="lib" path="jars/org.eclipse.jface_3.7.0.I20110522-1430.jar"/>
+	<classpathentry kind="lib" path="jars/org.eclipse.jface.text_3.7.0.v20110505-0800.jar"/>
+	<classpathentry kind="lib" path="jars/org.eclipse.osgi_3.7.0.v20110613.jar"/>
+	<classpathentry kind="lib" path="jars/swt-grouplayout.jar"/>
+	<classpathentry kind="lib" path="jars/swt.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

@@ -1,0 +1,145 @@
+package org.cloudbus.cloudsim.policy.VmsToHosts;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.Vector;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Log;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.VmAllocationPolicy;
+import org.cloudbus.cloudsim.policy.ListAllocationPolicy;
+import org.cloudbus.cloudsim.policy.utils.ACOConfig;
+import org.cloudbus.cloudsim.policy.utils.ExtendedHelper;
+import org.cloudbus.cloudsim.policy.utils.HelpUtils;
+
+import org.cloudbus.cloudsim.hust.ant.ACO;
+import org.cloudbus.cloudsim.hust.base.PhysicalMachine;
+import org.cloudbus.cloudsim.hust.base.VirtualMachine;
+
+public class VmAllocationPolicyAnt extends VmAllocationPolicy implements ListAllocationPolicy {
+    /** The vm table. */
+    private Map<String, Host> vmTable;
+    private static final String LINE_SEPARATOR = ExtendedHelper.getLineSeparator();
+	
+	public static PhysicalMachine [] origin_pms; //物理机剩余性能
+	public static VirtualMachine  []origin_vms; //物理机原始性能
+	
+	public static ACO aco;
+	Vector<Integer> bestSequence=new Vector<Integer>(30);
+	
+	public VmAllocationPolicyAnt(List<? extends Host> list) {
+        super(list);
+        setVmTable(new HashMap<String, Host>());
+	}
+	
+	   private void printLogMsg(String msg) {
+	        Log.print("ANT_Allocator: " + msg + LINE_SEPARATOR);
+	    }
+    
+
+	 //关键函数【1】
+	@Override
+	public boolean allocateHostForVmList(List<Vm> vmsToAllocate) {
+		 printLogMsg("Allocating host for "+vmsToAllocate.size()+" vms ");
+		List<Host> hostList=getHostList();
+	    origin_vms=HelpUtils.createVirtualMachineFromStart(vmsToAllocate);
+		origin_pms=HelpUtils.createPhysicalMachineByCurrentTime(hostList);
+		aco=new ACO(origin_pms,origin_vms,
+				ACOConfig.antnum,ACOConfig.gen,
+				ACOConfig.alpha,ACOConfig.beta,ACOConfig.rho);
+	    aco.init();
+		aco.solve();
+		bestSequence=aco.getBestSequence();
+//		System.out.println(bestSequence); //test code 
+		int count=0;
+		for(Vm vm:vmsToAllocate){
+			if(allocateHostForVm(vm))
+				count++;
+		}
+		
+		return count==hostList.size();
+	}
+  
+	//关键函数【2]this is called when virtual machine is being  created!  
+	@Override
+	public boolean allocateHostForVm(Vm vm) {
+		// TODO Auto-generated method stub
+		Host targetHost=getHostList().get(this.bestSequence.get(vm.getId()));
+		return allocateHostForVm(vm,targetHost);
+	}
+	
+	//关键函数【3】 ]this is called when virtual machine is being  migritted! 
+	@Override
+    public boolean allocateHostForVm(Vm vm, Host host) {
+		printLogMsg("Try to allocate vm="+ vm.getId() +" on  host=" +host.getId());
+		if(host.isSuitableForVm(vm)){
+			if (host.vmCreate(vm)) {
+            //the host is appropriate, we track it
+        	   printLogMsg("Vm created successfuly");
+	            getVmTable().put(vm.getUid(), host);
+	            
+	            //放入物理机虚拟机映射
+	            Vector<Integer>value=deployMap.get(host.getId());
+	            if(value==null)
+	            	value=new Vector<Integer>();
+	        	value.add(vm.getId());
+	        	deployMap.put(host.getId(), value);
+	        	
+	            return true;
+        }
+	  }
+        return false;
+    }
+
+	//在虚拟机动态迁移中使用
+	@Override
+	public List<Map<String, Object>> optimizeAllocation(List<? extends Vm> vmList) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	 @Override
+	    public void deallocateHostForVm(Vm vm) {
+	        Host host = getVmTable().remove(vm.getUid());
+	        if (host != null) {
+	            host.vmDestroy(vm);
+	        }
+	    }
+
+	    @Override
+	    public Host getHost(Vm vm){
+	        return getVmTable().get(vm.getUid());
+	    }
+
+	    @Override
+	    public Host getHost(int vmId, int userId) {
+	        return getVmTable().get(Vm.getUid(userId, vmId));
+	    }
+		
+	
+    /**
+     * Sets the vm table.
+     *
+     * @param vmTable the vm table
+     */
+    protected void setVmTable(Map<String, Host> vmTable) {
+        this.vmTable = vmTable;
+    }
+    /**
+     * Gets the vm table.
+     *
+     * @return the vm table
+     */
+    public Map<String, Host> getVmTable() {
+        return vmTable;
+    }
+    
+    public TreeMap<Integer, Vector<Integer>> getDeployMap() {
+		return deployMap;
+	}
+    
+	
+}

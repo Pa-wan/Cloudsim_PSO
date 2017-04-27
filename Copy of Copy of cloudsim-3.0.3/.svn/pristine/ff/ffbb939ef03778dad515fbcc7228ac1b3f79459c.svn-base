@@ -1,0 +1,293 @@
+package org.cloudbus.cloudsim.hust.aco;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+
+public class ACO {
+	public Ant[] ants;//蚂蚁
+	private int antNum;//蚂蚁数量
+	private List<Vm> vmList;//虚拟机列表
+	private List<Host> hostList;//物理机列表
+	private int MAX_GEN; // 运行代数
+	/**
+	 * string-->vm.uid<br/>
+	 * integer-->host.id
+	 */
+	private static Map<String,HashMap<Integer, Double>> pheromone; // 信息素矩阵
+	private Map<String,HashMap<Integer, Double>> distance; // 距离矩阵
+	private double bestLoad;
+
+	// 三个参数
+	public static double alpha;
+	public static double beta;
+	public static double rho;
+	private LinkedList<Solution> pareto;
+	private Solution bestSolution;
+	private Map<String,ArrayList<Host>> allowed;//可以满足该虚拟机的物理机候选表
+	private Map<Integer,ArrayList<Vm>> update;//可以满足该物理机的虚拟机列表，目的在于提高资源更新效率
+	private Map<Integer,Host> hostById;
+	private Map<String,Vm> vmByUid;
+	//public static Map<Integer,Long> storageMap;//物理机固有的存储，Host类中不保存该值
+	
+	public ACO(int antNum,List<Vm> vms,List<Host> hosts,int gen,double alpha,double beta,double rho){
+		this.antNum=antNum;
+		ants=new Ant[antNum];
+		vmList=vms;
+		hostList=hosts;
+		MAX_GEN=gen;
+		this.alpha=alpha;
+		this.beta=beta;
+		this.rho=rho;
+		bestLoad=Double.MAX_VALUE;
+		init();
+	}
+	
+	private void init(){
+		distance=new HashMap<String, HashMap<Integer,Double>>();
+		allowed=new HashMap<String,ArrayList<Host>>();
+		update=new HashMap<Integer,ArrayList<Vm>>();
+		hostById=new HashMap<Integer, Host>();
+		vmByUid=new HashMap<String, Vm>();
+		//storageMap=new HashMap<Integer, Long>();
+		pheromone=new HashMap<String, HashMap<Integer,Double>>();
+		pareto=new LinkedList<Solution>();
+		Map<String, HashMap<Integer,Boolean>> matchMatrix=new HashMap<String, HashMap<Integer,Boolean>>();
+		
+		Solution firstAnswer=new Solution(Integer.MIN_VALUE,Double.MAX_VALUE,null);
+		pareto.add(firstAnswer);
+//		for(Host host:hostList){
+//			storageMap.put(host.getId(), host.getStorage());
+//		}
+		
+		for(Vm vm:vmList){//计算每台虚拟机的物理机候选表和资源匹配距离
+			vmByUid.put(vm.getUid(), vm);
+			ArrayList<Host>  temp=new ArrayList<Host>();
+			HashMap<Integer, Double> map=new HashMap<Integer, Double>();
+			HashMap<Integer, Double> dismap=new HashMap<Integer, Double>();
+			HashMap<Integer, Boolean> boolMap=new HashMap<Integer, Boolean>();
+			for(Host host:hostList){
+				map.put(host.getId(), 1.0);
+				if(Utils.isSuitable(vm,host)){
+					double s=Utils.calcuDistance(vm,host);
+					dismap.put(host.getId(), s);
+					boolMap.put(host.getId(), true);
+					temp.add(host);
+				}else{
+					dismap.put(host.getId(), 0.0);
+					boolMap.put(host.getId(), false);
+				}
+			}
+			distance.put(vm.getUid(), dismap);
+			pheromone.put(vm.getUid(), map);//初始化信息素矩阵
+			matchMatrix.put(vm.getUid(), boolMap);
+			allowed.put(vm.getUid(), temp);
+		}
+		
+	  for(Host host:hostList){
+		  hostById.put(host.getId(), host);
+		  ArrayList<Vm> temp=new ArrayList<Vm>();
+		  for(Vm vm:vmList){
+			  if(matchMatrix.get(vm.getUid()).get(host.getId())){
+				  temp.add(vm);
+			  }
+		  }
+		  update.put(host.getId(), temp);
+	  }
+		
+		// 随机放置蚂蚁
+		for (int i = 0; i < antNum; i++) {
+			ants[i] = new Ant(vmList, hostList);
+			ants[i].init(distance, allowed, update);
+		}
+	}
+	/**
+	 *解决问题入口方法
+	 */
+	public void solve() {
+		int g=1;
+		for (g = 1; g <=MAX_GEN; g++) {
+			 ForkJoinPool forkJoinPool = new ForkJoinPool(); 
+			 try {
+			 forkJoinPool.submit(new ParallelAnt(0,antNum,this));
+			 forkJoinPool.shutdown();//两者顺序一定不能放反了
+ 			 forkJoinPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			// antNum只蚂蚁
+			for (int i = 0; i < antNum; i++) {
+				if(ants[i].getVmTohost().size()==vmList.size()){
+				boolean f=false;
+				for(ListIterator<Solution> it=pareto.listIterator();it.hasNext();){
+					Solution iter=it.next();
+					if((ants[i].getBestLoad()>iter.getBestLoad() && ants[i].getBanlanceDegree()<iter.getBanlanceDegree())){
+						it.remove();
+					}
+					else if(ants[i].getBestLoad()<iter.getBestLoad() && ants[i].getBanlanceDegree()>iter.getBanlanceDegree()){
+						f=true;
+						break;
+					}
+				}
+				if(!f){
+					Map<String,Integer> vmTohost=new HashMap<String, Integer>();
+					Iterator<Entry<String,Integer>> it=ants[i].getVmTohost().entrySet().iterator();
+					while(it.hasNext()){
+						Entry<String,Integer> entry=it.next();
+						vmTohost.put(entry.getKey(), entry.getValue());
+					}
+					Solution newAnswer=new Solution(ants[i].getBestLoad(),ants[i].getBanlanceDegree(),vmTohost);
+					pareto.add(newAnswer);
+					// 更新这只蚂蚁的信息素变化矩阵
+					for(Vm vm:vmList){
+						int hostid=ants[i].getVmTohost().get(vm.getUid());
+						ants[i].getDelta().get(vm.getUid()).put(hostid,g*50.0/MAX_GEN);
+					}
+				}
+				double temp=ants[i].getBanlanceDegree();
+				if(temp<bestLoad){
+					bestLoad=temp;
+					System.out.println(g+"  "+i+" "+ants[i].getBestLoad()+"   "+ants[i].getBanlanceDegree());
+				}
+			  }
+			}
+			// 更新信息素
+			updatePheromone();
+			// 重新初始化蚂蚁
+			for (int i = 0; i < antNum; i++) {
+				ants[i].reset();
+				ants[i].init(distance, allowed, update);
+			}
+		}
+		System.out.println("g="+g);
+		// 打印最佳结果
+		printOptimal();
+	}
+	/**
+	 * 获取唯一解
+	 */
+	private void printOptimal() {
+		int tempLoad=Integer.MIN_VALUE;
+		double tempBD=Double.MAX_VALUE;
+		Solution tempSolution=null;
+		for(Solution solution:pareto){
+			if(solution.getBestLoad()>tempLoad){
+				tempLoad=solution.getBestLoad();
+				tempBD=solution.getBanlanceDegree();
+				tempSolution=solution;
+			}
+			else if(solution.getBestLoad()==tempLoad){
+				if(solution.getBanlanceDegree()<=tempBD){
+					tempLoad=solution.getBestLoad();
+					tempBD=solution.getBanlanceDegree();
+					tempSolution=solution;
+				}
+			}
+		}
+		bestSolution=tempSolution;
+		System.out.println(tempSolution.getVmTohost());
+		System.out.println(tempSolution.getBestLoad());
+		System.out.println(tempSolution.getBanlanceDegree());
+	}
+
+	/**
+	 * 更新信息素
+	 */
+	private void updatePheromone() {
+		//信息素挥发
+		for(Vm vm:vmList){
+			for(Host host:hostList){
+				double oldValue=pheromone.get(vm.getUid()).get(host.getId());
+				pheromone.get(vm.getUid()).put(host.getId(), oldValue*(1-rho));
+			}
+		}
+		//信息素更新
+		for(Vm vm:vmList){
+			for(Host host:hostList){
+				double sumDelta=0;
+				for(int k=0;k<antNum;k++){
+					sumDelta+=ants[k].getDelta().get(vm.getUid()).get(host.getId());
+				}
+				double updatedPheronmone=pheromone.get(vm.getUid()).get(host.getId())+sumDelta;
+				if(updatedPheronmone>15)
+					pheromone.get(vm.getUid()).put(host.getId(), 15.0);
+				else if(updatedPheronmone<0.000001)
+					pheromone.get(vm.getUid()).put(host.getId(), 0.000001);
+				else
+					pheromone.get(vm.getUid()).put(host.getId(), updatedPheronmone);
+			}
+		}
+	}
+
+	
+
+	public static Map<String, HashMap<Integer, Double>> getPheromone() {
+		return pheromone;
+	}
+
+	public static void setPheromone(Map<String, HashMap<Integer, Double>> pheromone) {
+		ACO.pheromone = pheromone;
+	}
+
+	public LinkedList<Solution> getPareto() {
+		return pareto;
+	}
+
+	public void setPareto(LinkedList<Solution> pareto) {
+		this.pareto = pareto;
+	}
+
+	public Solution getBestSolution() {
+		return bestSolution;
+	}
+
+	public void setBestSolution(Solution bestSolution) {
+		this.bestSolution = bestSolution;
+	}
+
+	public List<Vm> getVmList() {
+		return vmList;
+	}
+
+	public void setVmList(List<Vm> vmList) {
+		this.vmList = vmList;
+	}
+
+	public List<Host> getHostList() {
+		return hostList;
+	}
+
+	public void setHostList(List<Host> hostList) {
+		this.hostList = hostList;
+	}
+
+	public Map<Integer, Host> getHostById() {
+		return hostById;
+	}
+
+	public void setHostById(Map<Integer, Host> hostById) {
+		this.hostById = hostById;
+	}
+
+	public Map<String, Vm> getVmByUid() {
+		return vmByUid;
+	}
+
+	public void setVmByUid(Map<String, Vm> vmByUid) {
+		this.vmByUid = vmByUid;
+	}
+	
+	
+
+	
+}

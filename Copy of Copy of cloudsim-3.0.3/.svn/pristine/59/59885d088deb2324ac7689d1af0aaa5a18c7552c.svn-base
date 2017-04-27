@@ -1,0 +1,138 @@
+package org.cloudbus.cloudsim.provisioners;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.VmAllocationPolicy;
+import org.cloudbus.cloudsim.policy.ConstantConfig;
+import org.cloudbus.cloudsim.policy.VmToHost.VmAllocationPolicyRandom;
+import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
+import org.cloudbus.cloudsim.policy.utils.ExtHelper;
+
+public class UtilProvisionerSimulation extends UtilProvisioner{
+	public UtilProvisionerSimulation(VmAllocationPolicy policy) {
+		super(policy);
+	}
+	
+	@Override
+	public void updateUtil() {
+		VmAllocationPolicy policy=getPolicy();
+		Map<Host,double[]> availableInTime=getAvailableInTime();
+		Map<Integer,double[]> util=getUtil();
+		Map<Integer,Double> utilAvg=getUtilAvg();
+		double avg[]=getAvg();
+		Map<Host,LinkedList<double[]>> utilTs=getUtilTs();
+		List<Host> hostList=policy.getHostList();
+		
+		//平衡态-->非平衡：请求随机放置，原有vm以一定概率销毁，请求速率大于销毁速率(过载)
+		//先顺序实现，后续改进需要两个线程：一个负责放置，一个负责销毁
+		Random random=new Random();
+		int addVms=random.nextInt(100);
+		
+		for(Host host:hostList){
+			availableInTime.get(host)[0]=host.getTotalMips();
+			availableInTime.get(host)[1]=host.getRam();
+			availableInTime.get(host)[2]=host.getBw();
+			availableInTime.get(host)[3]=Main.storageMap.get(host.getId());
+			
+			List<Vm> vmsInHost=host.getVmList();
+			Iterator<Vm> iter=vmsInHost.iterator();
+			while(iter.hasNext()){
+				Vm vm=iter.next();
+				double p=random.nextDouble();
+				if(p<=0.1){//以0.1概率销毁
+					vmDestroy(vm, host);
+					iter.remove();
+					vm.setHost(null);
+				}
+			}
+		}
+		
+		List<Vm> vmList=ExtHelper.createVmList(Main.userId++, addVms);
+//		List<Vm> vmList=new ArrayList<Vm>();
+//        for(int i=0;i<addVms;i++){
+//        	vmList.addAll(ExtHelper.createVmList(Main.userId++, 1));
+//        }
+		VmAllocationPolicy vmAllocationPolicy=new VmAllocationPolicyRandom(hostList);
+		vmAllocationPolicy.optimizeAllocation(vmList);
+		
+		double sumCpu=0,sumMem=0,sumBw=0,sumStorage=0;
+		for(Host host:hostList){
+			util.put(host.getId(), new double[ConstantConfig.resNum]);
+			for(Vm vm:host.getVmList()){//负载动态变化
+				List<Double> mips=new ArrayList<Double>();
+				mips.add(vm.getNumberOfPes()*vm.getMips()*getRandomValue(vm));
+				vm.setCurrentAllocatedMips(mips);
+				vm.setCurrentAllocatedRam((int)(vm.getRam()*getRandomValue(vm)));
+				vm.setCurrentAllocatedBw((long)(vm.getBw()*getRandomValue(vm)));
+				vm.setCurrentAllocatedSize((long)(vm.getSize()*getRandomValue(vm)));
+				
+				availableInTime.get(host)[0]-=vm.getCurrentAllocatedMips().get(0);
+				availableInTime.get(host)[1]-=vm.getCurrentAllocatedRam();
+				availableInTime.get(host)[2]-=vm.getCurrentAllocatedBw();
+				availableInTime.get(host)[3]-=vm.getCurrentAllocatedSize();
+			}
+			
+			util.get(host.getId())[0]=(host.getTotalMips()-availableInTime.get(host)[0])/host.getTotalMips();
+			util.get(host.getId())[1]=(host.getRam()-availableInTime.get(host)[1])/(host.getRam()+0.0);
+			util.get(host.getId())[2]=(host.getBw()-availableInTime.get(host)[2])/(host.getBw()+0.0);
+			util.get(host.getId())[3]=(Main.storageMap.get(host.getId())-availableInTime.get(host)[3])/(Main.storageMap.get(host.getId())+0.0);
+		
+			sumCpu+=util.get(host.getId())[0];
+			sumMem+=util.get(host.getId())[1];
+			sumBw+=util.get(host.getId())[2];
+			sumStorage+=util.get(host.getId())[3];
+			
+			double tempAvg=(util.get(host.getId())[0]+util.get(host.getId())[1]+util.get(host.getId())[2]+util.get(host.getId())[3])/4;
+			utilAvg.put(host.getId(), tempAvg);			
+			
+			double[] tempUtil=new double[]{util.get(host.getId())[0],util.get(host.getId())[1],util.get(host.getId())[2],util.get(host.getId())[3]};
+			//容量充足直接加入末尾，否则移除第一个
+			if(utilTs.get(host).size()<capacity){
+				utilTs.get(host).addLast(tempUtil);
+			}else{
+				utilTs.get(host).removeFirst();
+				utilTs.get(host).addLast(tempUtil);
+			}
+		}
+		
+		avg[0]=sumCpu/(hostList.size());
+		avg[1]=sumMem/(hostList.size());
+		avg[2]=sumBw/(hostList.size());
+		avg[3]=sumStorage/(hostList.size());
+		
+	}
+	
+	/**
+	 * 重新写方法是为了消除ConcurrentModification异常
+	 * @param vm
+	 * @param host
+	 */
+	private void vmDestroy(Vm vm,Host host){
+		host.getVmScheduler().deallocatePesForVm(vm);
+		host.getRamProvisioner().deallocateRamForVm(vm);
+		host.getBwProvisioner().deallocateBwForVm(vm);
+		host.setStorage(host.getStorage()+vm.getSize());
+		
+		vm.setCurrentAllocatedBw(0);
+		vm.setCurrentAllocatedMips(null);
+		vm.setCurrentAllocatedRam(0);
+		vm.setCurrentAllocatedSize(0);
+	}
+	
+	private double getRandomValue(Vm vm){
+		Random r=new Random();
+		return 1-0.5*r.nextDouble();
+//		if(vm.getHost().getId()%3!=0)
+//			return 0.2*r.nextDouble();
+//		else
+//			return 1-0.2*r.nextDouble();
+	}
+
+}

@@ -1,0 +1,148 @@
+package org.cloudbus.cloudsim.hust.pso2;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.hust.aco.Solution;
+import org.cloudbus.cloudsim.hust.aco.Utils;
+
+public class PSO {
+	private Particle[] particles;//粒子
+	private int particleNum;//粒子数量
+	private List<Vm> vmList;//虚拟机列表
+	private List<Host> hostList;//物理机列表
+	public static double[] gbest;//粒子全局最优位置
+	public static int MAX_GEN; // 运行代数
+	private Map<String,ArrayList<Host>> allowed;//可以满足该虚拟机的物理机候选表
+	private Map<Integer,Host> hostById;
+	private Map<String,Vm> vmByUid;
+	private Solution bestSolution;
+	private double bestLoad;
+	
+	public PSO(int num,List<Vm> vms,List<Host> hosts,int gen){
+		this.particleNum=num;
+		particles=new Particle[particleNum];
+		this.vmList=vms;
+		this.hostList=hosts;
+		this.MAX_GEN=gen;
+		bestLoad=Double.MAX_VALUE;
+		gbest=new double[vms.size()];
+		init();
+	}
+	
+	public void init(){
+		int vmNum=vmList.size();
+		int hostNum=hostList.size();
+		
+		allowed=new HashMap<String,ArrayList<Host>>();
+		hostById=new HashMap<Integer, Host>();
+		vmByUid=new HashMap<String, Vm>();
+		boolean matchMatrix[][]=new boolean[vmNum][hostNum];
+		
+		for(Vm vm:vmList){//计算每台虚拟机的物理机候选表
+			vmByUid.put(vm.getUid(), vm);
+			ArrayList<Host>  temp=new ArrayList<Host>();
+			for(Host host:hostList){
+				if(Utils.isSuitable(vm,host)){
+					matchMatrix[vm.getId()][host.getId()]=true;
+					temp.add(host);
+				}else{
+					matchMatrix[vm.getId()][host.getId()]=false;
+				}
+			}
+			allowed.put(vm.getUid(), temp);
+		}
+		
+	  for(Host host:hostList)
+		  hostById.put(host.getId(), host);
+			  
+	  for(int i=0;i<particleNum;i++){
+		  particles[i]=new Particle(vmList,hostList);
+		  particles[i].init(allowed);
+	   }
+	 }
+
+	public void solve(){
+		int i=0;
+		for(i=0;i<MAX_GEN;i++){
+			
+			Particle tempbest=null;
+			for(int j=0;j<particleNum;j++){
+				if(particles[j].getBanlanceDegree()<bestLoad){
+					bestLoad=particles[j].getBanlanceDegree();
+					tempbest=particles[j];
+					
+					Map<String,Integer> vmTohost=new HashMap<String, Integer>();
+					Iterator<Entry<String,Integer>> it=particles[j].getVmTohost().entrySet().iterator();
+					while(it.hasNext()){
+						Entry<String,Integer> entry=it.next();
+						vmTohost.put(entry.getKey(), entry.getValue());
+					}
+					bestSolution=new Solution(particles[j].getBestLoad(),particles[j].getBanlanceDegree(),vmTohost);
+					System.out.println(i+"  "+j+"  "+bestLoad);
+				}
+			}
+			if(tempbest!=null){
+				for(Vm vm:vmList){
+					gbest[vm.getId()]=tempbest.getPos()[vm.getId()];
+				}
+			}
+			ForkJoinPool forkJoinPool = new ForkJoinPool(); 
+			 try {
+			 forkJoinPool.submit(new ParallelParticle(0,particleNum,this));
+			 forkJoinPool.shutdown();//两者顺序一定不能放反了
+			 forkJoinPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+//			for(int j=0;j<particleNum;j++){
+//				particles[j].run();
+//			}
+		}
+		System.out.println("i="+i);
+		System.out.println(bestSolution.getVmTohost());
+	}
+
+	public Particle[] getParticles() {
+		return particles;
+	}
+
+	public void setParticles(Particle[] particles) {
+		this.particles = particles;
+	}
+
+	public Solution getBestSolution() {
+		return bestSolution;
+	}
+
+	public void setBestSolution(Solution bestSolution) {
+		this.bestSolution = bestSolution;
+	}
+
+	public Map<Integer, Host> getHostById() {
+		return hostById;
+	}
+
+	public void setHostById(Map<Integer, Host> hostById) {
+		this.hostById = hostById;
+	}
+
+	public Map<String, Vm> getVmByUid() {
+		return vmByUid;
+	}
+
+	public void setVmByUid(Map<String, Vm> vmByUid) {
+		this.vmByUid = vmByUid;
+	}
+	
+	
+	
+}

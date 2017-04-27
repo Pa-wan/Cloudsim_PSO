@@ -1,0 +1,400 @@
+package org.cloudbus.cloudsim.hust.migrate;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.hust.aco.ACO;
+import org.cloudbus.cloudsim.hust.aco.Utils;
+import org.cloudbus.cloudsim.policy.ConstantConfig;
+import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
+import org.cloudbus.cloudsim.provisioners.UtilProvisioner;
+
+public class Migration {
+	private HotSpotDetection hotSpotDetection;
+	private int migrationTimes;
+	private double banlanceDegree;
+	private int bestLoad;
+	private Map<Integer,double[]> oldUtil;
+	private Map<Integer,double[]> util;
+	private Set<Host> set;
+	
+	public Migration(HotSpotDetection hotSpotDetection) {
+		this.hotSpotDetection=hotSpotDetection;
+		migrationTimes=0;
+		banlanceDegree=0;
+		bestLoad=0;
+		set=new HashSet<Host>();
+	}
+	
+	public void clearHotSpots(){
+		List<Host> hotSpots=hotSpotDetection.getHotSpots();
+		Map<Integer,double[]> hostUtils=hotSpotDetection.getUtilProvisioner().getUtil();
+		
+		migrationTimes=0;
+		set.clear();
+		System.out.println("   hotNum:"+hotSpots.size());
+		Iterator<Host> it=hotSpots.iterator();
+		while(it.hasNext()){
+			Host host=it.next();
+		//for(Host host:hotSpots){
+			Map<Vm,Host> vmToHost=new HashMap<Vm, Host>();
+			Map<Vm,Host> vmFromHost=new HashMap<Vm, Host>();
+			double[] hostUtil=hostUtils.get(host.getId());//物理机四维资源利用率
+			Map<Vm,Double> vmScoreMap=new HashMap<Vm, Double>();
+			Map<Vm,double[]> vmUtilMap=new HashMap<Vm, double[]>();
+			for(Vm vm:host.getVmList()){
+				double[] vmUtil=new double[4];//虚拟机占用物理机资源比率
+				vmUtil[0]=vm.getCurrentAllocatedMips().get(0)/host.getTotalMips();
+				vmUtil[1]=vm.getCurrentAllocatedRam()/(host.getRam()+0.0);
+				vmUtil[2]=vm.getCurrentAllocatedBw()/(host.getBw()+0.0);
+				vmUtil[3]=vm.getCurrentAllocatedSize()/(Main.storageMap.get(host.getId())+0.0);
+				
+				vmScoreMap.put(vm, getScore(hostUtil, vmUtil));
+				vmUtilMap.put(vm, vmUtil);
+			}
+			
+			List<Map.Entry<Vm, Double>> list=new ArrayList<Map.Entry<Vm,Double>>(vmScoreMap.entrySet());
+			Collections.sort(list, new Comparator<Map.Entry<Vm,Double>>() {   
+			    public int compare(Map.Entry<Vm,Double> o1, Map.Entry<Vm,Double> o2) {
+			    	double d=o2.getValue() - o1.getValue();
+			    	if(d>0)
+			    		return 1;
+			    	else if(d<0)
+			    		return -1;
+			    	else 
+			    		return 0;
+			    }
+			}); 
+			
+			List<Vm> sortedVmList=new ArrayList<Vm>();
+			for(int i=0;i<list.size();i++){
+				sortedVmList.add(list.get(i).getKey());
+			}
+			
+			List<Vm> migrationOut=new ArrayList<Vm>();
+			double[] newHostUtil=new double[4];
+			for(int i=0;i<4;i++)
+				newHostUtil[i]=hostUtil[i];//迭代累积更新，否则只是单点变化
+			for(Vm vm:sortedVmList){//按得分重新分配直到消除该热点
+				subtraction(newHostUtil,vmUtilMap.get(vm), newHostUtil);
+				if(HotSpotDetection.isHighLoaded(newHostUtil)){
+					migrationOut.add(vm);
+				}else{
+					migrationOut.add(vm);
+					break;
+				}
+			}
+			
+			UtilProvisioner utilProvisioner=hotSpotDetection.getUtilProvisioner();
+			
+			boolean allPlaced=true;
+			for (Vm vm : migrationOut) {
+				double maxFactor = 0;
+				Host tempHost = null;
+				for (Host lowedHost : hotSpotDetection.getLowLoaded()) {
+					if (Utils.isSuitable(vm, lowedHost)
+							&& !isHighLoaded(vm, lowedHost)) {//此处问题：实时数据要更新，不是不变lowed,availabeintime
+						double[] hostAvaiable=utilProvisioner.getAvailableInTime().get(lowedHost);
+						double avg = avgUtil(lowedHost);
+						double factor = Utils.calcuFactor(vm, lowedHost,hostAvaiable)/ (avg + 0.1);
+						if (factor > maxFactor) {
+							maxFactor = factor;
+							tempHost = lowedHost;
+						}
+					}
+				}
+				// 更新目标剩余资源,原主机资源并未释放，直到全部放置完统一释放
+				if (tempHost != null) {
+					vmFromHost.put(vm, vm.getHost());
+					vmToHost.put(vm, tempHost);
+					tempHost.vmCreateInTime(vm);
+					//更新实时数据
+					updateInTime(vm, tempHost,host);
+					migrationTimes++;
+				} else {
+					allPlaced=false;
+					break;
+				}
+					
+		  }
+			
+			if(!allPlaced){//没有全部部署，则前期部署还原
+				Iterator<Entry<Vm,Host>> iter=vmToHost.entrySet().iterator();
+				while(iter.hasNext()){
+					Entry<Vm,Host> entry=iter.next();
+					Vm vm=entry.getKey();
+					Host hostOfvm=entry.getValue();
+					hostOfvm.vmDestroy(vm);//释放目标主机资源
+					vm.setHost(vmFromHost.get(vm));//恢复原来映射关系
+					migrationTimes--;
+					//实时数据还原
+					updateInTime(vm, host, hostOfvm);
+				}
+			}else{//全部部署则统一释放原主机资源
+				Iterator<Entry<Vm,Host>> iter=vmFromHost.entrySet().iterator();
+				while(iter.hasNext()){
+					Entry<Vm,Host> entry=iter.next();
+					Vm vm=entry.getKey();
+					Host hostOfvm=entry.getValue();
+					hostOfvm.vmDestroy(vm);//释放原主机资源,会set(null)
+					vm.setHost(vmToHost.get(vm));
+					System.out.println(host.getId()+"---->"+vmToHost.get(vm).getId());
+				}
+				hotSpotDetection.getHighLoaded().remove(host);
+				it.remove();
+				hotSpotDetection.getLowLoaded().add(host);
+				
+				Iterator<Entry<Vm,Host>> itor=vmToHost.entrySet().iterator();
+				set.add(host);
+				while(itor.hasNext()){
+					Entry<Vm,Host> entry=itor.next();
+					set.add(entry.getValue());
+				}
+				
+				//更新迁移虚拟机原与目标主机的实时剩余资源量
+//				Map<Host,double[]> availableInTime=hotSpotDetection.getUtilProvisioner().getAvailableInTime();
+//				for(Vm vm:migrationOut){
+//					availableInTime.get(host)[0]+=vm.getCurrentAllocatedMips().get(0);
+//					availableInTime.get(host)[1]+=vm.getCurrentAllocatedRam();
+//					availableInTime.get(host)[2]+=vm.getCurrentAllocatedBw();
+//					availableInTime.get(host)[3]+=vm.getCurrentAllocatedSize();
+//					
+//					availableInTime.get(vm.getHost())[0]-=vm.getCurrentAllocatedMips().get(0);
+//					availableInTime.get(vm.getHost())[1]-=vm.getCurrentAllocatedRam();
+//					availableInTime.get(vm.getHost())[2]-=vm.getCurrentAllocatedBw();
+//					availableInTime.get(vm.getHost())[3]-=vm.getCurrentAllocatedSize();
+//				}
+				
+			}
+		}
+	}
+	
+	private void updateInTime(Vm vm,Host disHost,Host srcHost){
+		UtilProvisioner utilProvisioner=hotSpotDetection.getUtilProvisioner();
+		double[] hostAvaiable=utilProvisioner.getAvailableInTime().get(disHost);
+		hostAvaiable[0]-=vm.getCurrentAllocatedMips().get(0);
+		hostAvaiable[1]-=vm.getCurrentAllocatedRam();
+		hostAvaiable[2]-=vm.getCurrentAllocatedBw();
+		hostAvaiable[3]-=vm.getCurrentAllocatedSize();
+		
+		double[] srcHostAvailable=utilProvisioner.getAvailableInTime().get(srcHost);
+		srcHostAvailable[0]+=vm.getCurrentAllocatedMips().get(0);
+		srcHostAvailable[1]+=vm.getCurrentAllocatedRam();
+		srcHostAvailable[2]+=vm.getCurrentAllocatedBw();
+		srcHostAvailable[3]+=vm.getCurrentAllocatedSize();
+		
+	}
+	
+	/**
+	 * 加权内积
+	 * @param a
+	 * @param b
+	 * @return
+	 */
+	private double getScore(double[] a,double[] b){
+		double product=0;
+		for(int i=0;i<a.length;i++){
+			product+=a[i]*b[i];
+		}
+		return product;
+	}
+	/**
+	 * 向量相减
+	 * @param a
+	 * @param b
+	 * @param result
+	 */
+	private void subtraction(double[] a,double[] b,double[] result){
+		for(int i=0;i<a.length;i++){
+			result[i]=a[i]-b[i];
+		}
+	}
+	/**
+	 * 计算host的平均利用率
+	 * @param host
+	 * @return
+	 */
+	private double avgUtil(Host host){
+		UtilProvisioner utilProvisioner=hotSpotDetection.getUtilProvisioner();
+		double[] hostAvaiable=utilProvisioner.getAvailableInTime().get(host);
+		
+		double utilcpu=(host.getTotalMips()-hostAvaiable[0])/host.getTotalMips();
+		double utilram=(host.getRam()-hostAvaiable[1])/(host.getRam()+0.0);
+		double utilbw=(host.getBw()-hostAvaiable[2])/(host.getBw()+0.0);
+		double utilstorage=(Main.storageMap.get(host.getId())-hostAvaiable[3])/(Main.storageMap.get(host.getId())+0.0);
+		double avg=(utilcpu+utilram+utilbw+utilstorage)/4;
+		return avg;
+	}
+	
+	/**
+	 * 判断将vm部署在host上是否过载
+	 * @param vm
+	 * @param host
+	 * @return
+	 */
+	private boolean isHighLoaded(Vm vm,Host host){
+		UtilProvisioner utilProvisioner=hotSpotDetection.getUtilProvisioner();
+		double[] hostAvaiable=utilProvisioner.getAvailableInTime().get(host);
+		double[] newHostUtil=new double[4];
+		newHostUtil[0]=(host.getTotalMips()-hostAvaiable[0]+vm.getCurrentAllocatedMips().get(0))/host.getTotalMips();
+		newHostUtil[1]=(host.getRam()-hostAvaiable[1]+vm.getCurrentAllocatedRam())/(host.getRam()+0.0);
+		newHostUtil[2]=(host.getBw()-hostAvaiable[2]+vm.getCurrentAllocatedBw())/(host.getBw()+0.0);
+		newHostUtil[3]=(Main.storageMap.get(host.getId())-hostAvaiable[3]+vm.getCurrentAllocatedSize())/(Main.storageMap.get(host.getId())+0.0);
+		return HotSpotDetection.isHighLoaded(newHostUtil);
+	}
+	
+	/**
+	 * 计算清除热点后的系统均衡度，统计迁移次数
+	 */
+	public void calcuMd(){
+		bestLoad=0;
+		List<Host> hostList=hotSpotDetection.getUtilProvisioner().getPolicy().getHostList();
+		util=new HashMap<Integer, double[]>();
+		double utilAvg[]=new double[hostList.size()];
+		double innerStd=0,outerStd=0;
+		double[] std=new double[hostList.size()];
+		double avg[]=new double[4];
+		double sumCpu=0,sumMem=0,sumBw=0,sumStorage=0;
+		Map<Host,double[]> availableInTime=hotSpotDetection.getUtilProvisioner().getAvailableInTime();
+		
+		for(Host host:hostList){
+			util.put(host.getId(), new double[ConstantConfig.resNum]);
+			double temp=0;
+			util.get(host.getId())[0]=(host.getTotalMips()-availableInTime.get(host)[0])/host.getTotalMips();
+			util.get(host.getId())[1]=(host.getRam()-availableInTime.get(host)[1])/(host.getRam()+0.0);
+			util.get(host.getId())[2]=(host.getBw()-availableInTime.get(host)[2])/(host.getBw()+0.0);
+			util.get(host.getId())[3]=(Main.storageMap.get(host.getId())-availableInTime.get(host)[3])/(Main.storageMap.get(host.getId())+0.0);
+			
+			sumCpu+=util.get(host.getId())[0];
+			sumMem+=util.get(host.getId())[1];
+			sumBw+=util.get(host.getId())[2];
+			sumStorage+=util.get(host.getId())[3];
+			
+			utilAvg[host.getId()]=(util.get(host.getId())[0]+util.get(host.getId())[1]+util.get(host.getId())[2]+util.get(host.getId())[3])/4;
+			for(int i=0;i<4;i++){
+				temp+=Math.pow(util.get(host.getId())[i]-utilAvg[host.getId()], 2);
+			}
+			std[host.getId()]=Math.sqrt(temp/4);
+			innerStd+=std[host.getId()];
+		}
+		
+		avg[0]=sumCpu/(hostList.size());
+		avg[1]=sumMem/(hostList.size());
+		avg[2]=sumBw/(hostList.size());
+		avg[3]=sumStorage/(hostList.size());
+		for(Host host:hostList){
+			boolean flag=false;
+			for(int i=0;i<4;i++){
+				if(!(Math.abs(util.get(host.getId())[i]-avg[i])<=0.1)){
+					flag=true;
+					break;
+				}
+			}
+			if(!flag){
+				bestLoad++;
+			}
+			
+			double temp=0;
+			for(int i=0;i<4;i++){
+				temp+=Math.pow(util.get(host.getId())[i]-avg[i], 2);
+				//temp+=Math.abs(util.get(host.getId())[i]-avg[i]);
+			}
+			//outerStd+=Math.sqrt(temp);
+			outerStd+=temp;
+		}
+		//banlanceDegree=(innerStd+outerStd)/hostList.size();//改进评价指标，引入内部资源方差
+		banlanceDegree=outerStd/hostList.size();
+	}
+	
+	public void copy(){
+		List<Host> hostList=hotSpotDetection.getUtilProvisioner().getPolicy().getHostList();
+		oldUtil=new HashMap<Integer, double[]>();
+		for (Host host : hostList) {
+			oldUtil.put(host.getId(), new double[ConstantConfig.resNum]);
+			for (int i = 0; i < ConstantConfig.resNum; i++) {
+				oldUtil.get(host.getId())[i] = util.get(host.getId())[i];
+			}
+		}
+	}
+	
+	public double change(){
+		System.out.println("setSize:"+set.size());
+		return local(set,util)-local(set,oldUtil);
+	}
+	
+	private double local(Set<Host> set,Map<Integer,double[]> util){
+		double avg[]=new double[ConstantConfig.resNum];
+		double sumCpu=0,sumMem=0,sumBw=0,sumStorage=0;
+		double innerStd=0;
+		for(Host host:set){
+			sumCpu+=util.get(host.getId())[0];
+			sumMem+=util.get(host.getId())[1];
+			sumBw+=util.get(host.getId())[2];
+			sumStorage+=util.get(host.getId())[3];
+			
+			double temp=0;
+			double utilavg=(util.get(host.getId())[0]+util.get(host.getId())[1]+util.get(host.getId())[2]+util.get(host.getId())[3])/4;
+			for(int i=0;i<4;i++){
+				temp+=Math.pow(util.get(host.getId())[i]-utilavg, 2);
+			}
+			innerStd+=Math.sqrt(temp/4);
+		}
+		avg[0]=sumCpu/(set.size());
+		avg[1]=sumMem/(set.size());
+		avg[2]=sumBw/(set.size());
+		avg[3]=sumStorage/(set.size());
+		
+		double outerStd=0;
+		for(Host host:set){
+			double temp=0;
+			for(int i=0;i<4;i++){
+				temp+=Math.pow(util.get(host.getId())[i]-avg[i], 2);
+			}
+			outerStd+=Math.sqrt(temp);
+		}
+		return outerStd;
+	}
+
+	public int getMigrationTimes() {
+		return migrationTimes;
+	}
+
+	public void setMigrationTimes(int migrationTimes) {
+		this.migrationTimes = migrationTimes;
+	}
+
+	public double getBanlanceDegree() {
+		return banlanceDegree;
+	}
+
+	public void setBanlanceDegree(double banlanceDegree) {
+		this.banlanceDegree = banlanceDegree;
+	}
+
+	public int getBestLoad() {
+		return bestLoad;
+	}
+
+	public void setBestLoad(int bestLoad) {
+		this.bestLoad = bestLoad;
+	}
+
+	public HotSpotDetection getHotSpotDetection() {
+		return hotSpotDetection;
+	}
+
+	public void setHotSpotDetection(HotSpotDetection hotSpotDetection) {
+		this.hotSpotDetection = hotSpotDetection;
+	}
+	
+}

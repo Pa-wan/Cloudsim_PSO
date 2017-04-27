@@ -1,0 +1,726 @@
+package org.cloudbus.cloudsim.ui;
+
+import java.awt.Dimension;
+import java.awt.Toolkit;
+
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.layout.FormAttachment;
+import org.eclipse.swt.layout.FormData;
+import org.eclipse.swt.layout.FormLayout;
+import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Combo;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Dialog;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Group;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Spinner;
+import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.TableColumn;
+import org.eclipse.swt.widgets.Text;
+import org.eclipse.swt.widgets.Tree;
+import org.eclipse.swt.widgets.TreeItem;
+import org.eclipse.wb.swt.SWTResourceManager;
+
+public class AdminFrame extends Dialog {
+
+	protected Object result;
+	protected Shell shell;
+	private Text numOfHost;
+	private Text numOfVm;
+	private Table bdInfo;
+	private Table vmsInHost;
+	private Table vmToHost;
+	private Table hostResourceTable;
+	private Table hostUtilTable;
+	private Table vmResourceTable;
+	private Table vmUtilTable;
+	private Text policyText;
+	private Text placeLogText;
+	private Text migrationLogText;
+
+	/**
+	 * Create the dialog.
+	 * @param parent
+	 * @param style
+	 */
+	public AdminFrame(Shell parent, int style) {
+		super(parent, style);
+		setText("SWT Dialog");
+	}
+
+	/**
+	 * Open the dialog.
+	 * @return the result
+	 */
+	public Object open() {
+		MainFrame.shell.setVisible(false);
+		createContents();
+		shell.open();
+		shell.layout();
+		Display display = getParent().getDisplay();
+		while (!shell.isDisposed()) {
+			if (!display.readAndDispatch()) {
+				display.sleep();
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Create contents of the dialog.
+	 */
+	private void createContents() {
+		shell = new Shell(getParent(), getStyle());
+		shell.setSize(703, 498);
+		shell.setText("管理员权限");
+		Dimension dm = Toolkit.getDefaultToolkit().getScreenSize();
+		shell.setBounds((int)(dm.getWidth()-1000)/2,(int)(dm.getHeight()-700)/2, 1000, 700);
+		shell.setLayout(new FormLayout());
+		
+		SashForm sashForm = new SashForm(shell, SWT.NONE);
+		FormData fd_sashForm = new FormData();
+		fd_sashForm.left = new FormAttachment(0, 3);
+		fd_sashForm.right = new FormAttachment(100, -3);
+		fd_sashForm.top = new FormAttachment(0, 0);
+		fd_sashForm.bottom = new FormAttachment(100, -25);
+		sashForm.setLayoutData(fd_sashForm);
+		
+		final Tree tree = new Tree(sashForm, SWT.BORDER);
+		tree.setFont(SWTResourceManager.getFont("微软雅黑", 12, SWT.NORMAL));
+		
+		final TreeItem dataCenter = new TreeItem(tree, SWT.NONE);
+		dataCenter.setText("数据中心概况");
+		
+		TreeItem resourceManger = new TreeItem(tree, SWT.NONE);
+		resourceManger.setText("资源管理");
+		
+		final TreeItem host = new TreeItem(resourceManger, SWT.NONE);
+		host.setText("物理机管理");
+		
+		final TreeItem vm = new TreeItem(resourceManger, SWT.NONE);
+		vm.setText("虚拟机管理");
+		
+		TreeItem provisor = new TreeItem(tree, SWT.NONE);
+		provisor.setText("资源监测");
+		
+		final TreeItem hostProvisor = new TreeItem(provisor, SWT.NONE);
+		hostProvisor.setText("物理机监测");
+		
+		final TreeItem vmProvisor = new TreeItem(provisor, SWT.NONE);
+		vmProvisor.setText("虚拟机监测");
+		
+		TreeItem resourceControl = new TreeItem(tree, SWT.NONE);
+		resourceControl.setText("资源调度");
+		
+		final TreeItem placePolicy = new TreeItem(resourceControl, SWT.NONE);
+		placePolicy.setText("虚拟机部署策略");
+		
+		final TreeItem migrationPolicy = new TreeItem(resourceControl, SWT.NONE);
+		migrationPolicy.setText("虚拟机迁移设置");
+		
+		TreeItem logManger = new TreeItem(tree, SWT.NONE);
+		logManger.setText("日志管理");
+		
+		final TreeItem placeLog = new TreeItem(logManger, SWT.NONE);
+		placeLog.setText("虚拟机部署日志");
+		
+		final TreeItem migrationLog = new TreeItem(logManger, SWT.NONE);
+		migrationLog.setText("虚拟机迁移日志");
+		
+		Composite composite = new Composite(sashForm, SWT.NONE);
+		composite.setLayout(new FormLayout());
+		
+		final Group migrationLogGp = new Group(composite, SWT.NONE);
+		FormData fd_migrationLogGp = new FormData();
+		fd_migrationLogGp.left = new FormAttachment(0, 3);
+		fd_migrationLogGp.right = new FormAttachment(100, -3);
+		fd_migrationLogGp.top = new FormAttachment(0, 0);
+		fd_migrationLogGp.bottom = new FormAttachment(100);
+		migrationLogGp.setLayoutData(fd_migrationLogGp);
+		migrationLogGp.setText("虚拟机迁移日志");
+		migrationLogGp.setLayout(new FormLayout());
+		
+		Button openMigrationLog = new Button(migrationLogGp, SWT.NONE);
+		FormData fd_openMigrationLog = new FormData();
+		fd_openMigrationLog.top = new FormAttachment(0, 10);
+		fd_openMigrationLog.left = new FormAttachment(0, 10);
+		openMigrationLog.setLayoutData(fd_openMigrationLog);
+		openMigrationLog.setText("打开迁移日志");
+		
+		migrationLogText = new Text(migrationLogGp, SWT.BORDER);
+		fd_openMigrationLog.bottom = new FormAttachment(migrationLogText, -15);
+		FormData fd_migrationLogText = new FormData();
+		fd_migrationLogText.top = new FormAttachment(openMigrationLog, 25);
+		fd_migrationLogText.left = new FormAttachment(0, 3);
+		fd_migrationLogText.right = new FormAttachment(100, -3);
+		fd_migrationLogText.bottom = new FormAttachment(100, -7);
+		migrationLogText.setLayoutData(fd_migrationLogText);
+		migrationLogText.setEditable(false);
+		
+		final Group placeLogGp = new Group(composite, SWT.NONE);
+		FormData fd_placeLogGp = new FormData();
+		fd_placeLogGp.left = new FormAttachment(0, 3);
+		fd_placeLogGp.right = new FormAttachment(100, -3);
+		fd_placeLogGp.top = new FormAttachment(0, 0);
+		fd_placeLogGp.bottom = new FormAttachment(100, -25);
+		placeLogGp.setLayoutData(fd_placeLogGp);
+		placeLogGp.setText("虚拟机部署日志");
+		placeLogGp.setLayout(new FormLayout());
+		
+		Button openPlaceLog = new Button(placeLogGp, SWT.NONE);
+		FormData fd_openPlaceLog = new FormData();
+		fd_openPlaceLog.top = new FormAttachment(0, 10);
+		fd_openPlaceLog.left = new FormAttachment(0, 10);
+		openPlaceLog.setLayoutData(fd_openPlaceLog);
+		openPlaceLog.setText("打开部署日志");
+		
+		placeLogText = new Text(placeLogGp, SWT.BORDER);
+		FormData fd_placeLogText = new FormData();
+		fd_placeLogText.top = new FormAttachment(openPlaceLog, 10);
+		fd_placeLogText.left = new FormAttachment(0, 3);
+		fd_placeLogText.right = new FormAttachment(100, -3);
+		fd_placeLogText.bottom = new FormAttachment(100, -7);
+		placeLogText.setLayoutData(fd_placeLogText);
+		placeLogText.setEditable(false);
+		
+		final Group migrationGp = new Group(composite, SWT.NONE);
+		FormData fd_migrationGp = new FormData();
+		fd_migrationGp.left = new FormAttachment(0, 3);
+		fd_migrationGp.right = new FormAttachment(100, -3);
+		fd_migrationGp.top = new FormAttachment(0, 0);
+		fd_migrationGp.bottom = new FormAttachment(100, -25);
+		migrationGp.setLayoutData(fd_migrationGp);
+		migrationGp.setText("虚拟机迁移设置");
+		
+		Group thresholdGp = new Group(migrationGp, SWT.NONE);
+		thresholdGp.setText("资源过载阈值");
+		thresholdGp.setBounds(10, 26, 466, 179);
+		
+		Label lblCpu = new Label(thresholdGp, SWT.NONE);
+		lblCpu.setBounds(10, 29, 61, 17);
+		lblCpu.setText("CPU:");
+		
+		Label lblRam = new Label(thresholdGp, SWT.NONE);
+		lblRam.setBounds(10, 63, 61, 17);
+		lblRam.setText("内存：");
+		
+		Spinner cpuThreshold = new Spinner(thresholdGp, SWT.BORDER);
+		cpuThreshold.setSelection(80);
+		cpuThreshold.setBounds(73, 26, 47, 23);
+		
+		Label lbl1 = new Label(thresholdGp, SWT.NONE);
+		lbl1.setBounds(126, 29, 61, 17);
+		lbl1.setText("%");
+		
+		Spinner ramThreshold = new Spinner(thresholdGp, SWT.BORDER);
+		ramThreshold.setSelection(80);
+		ramThreshold.setBounds(73, 57, 47, 23);
+		
+		Label lbl2 = new Label(thresholdGp, SWT.NONE);
+		lbl2.setText("%");
+		lbl2.setBounds(126, 63, 61, 17);
+		
+		Label lblBw = new Label(thresholdGp, SWT.NONE);
+		lblBw.setBounds(10, 98, 61, 17);
+		lblBw.setText("带宽：");
+		
+		Spinner bwThreshold = new Spinner(thresholdGp, SWT.BORDER);
+		bwThreshold.setSelection(80);
+		bwThreshold.setBounds(73, 98, 47, 23);
+		
+		Spinner storageThreshold = new Spinner(thresholdGp, SWT.BORDER);
+		storageThreshold.setSelection(80);
+		storageThreshold.setBounds(73, 136, 47, 23);
+		
+		Label lbl3 = new Label(thresholdGp, SWT.NONE);
+		lbl3.setText("%");
+		lbl3.setBounds(126, 104, 61, 17);
+		
+		Label lbl4 = new Label(thresholdGp, SWT.NONE);
+		lbl4.setText("%");
+		lbl4.setBounds(126, 139, 61, 17);
+		
+		Label lblStorage = new Label(thresholdGp, SWT.NONE);
+		lblStorage.setBounds(10, 139, 61, 17);
+		lblStorage.setText("存储：");
+		
+		Label lbl5 = new Label(migrationGp, SWT.NONE);
+		lbl5.setBounds(10, 225, 90, 17);
+		lbl5.setText("采用预测算法：");
+		
+		Button checkButton = new Button(migrationGp, SWT.CHECK);
+		checkButton.setSelection(true);
+		checkButton.setBounds(110, 225, 98, 17);
+		checkButton.setText("是");
+		
+		Button btnNewButton = new Button(migrationGp, SWT.NONE);
+		btnNewButton.setBounds(10, 272, 80, 27);
+		btnNewButton.setText("确认");
+		
+		final Group placePolicyGp = new Group(composite, SWT.NONE);
+		FormData fd_placePolicyGp = new FormData();
+		fd_placePolicyGp.left = new FormAttachment(0, 3);
+		fd_placePolicyGp.right = new FormAttachment(100, -3);
+		fd_placePolicyGp.top = new FormAttachment(0, 0);
+		fd_placePolicyGp.bottom = new FormAttachment(100, -25);
+		placePolicyGp.setLayoutData(fd_placePolicyGp);
+		placePolicyGp.setText("虚拟机部署策略");
+		placePolicyGp.setLayout(new FormLayout());
+		
+		Label placeLabel = new Label(placePolicyGp, SWT.NONE);
+		FormData fd_placeLabel = new FormData();
+		fd_placeLabel.left = new FormAttachment(0, 20);
+		fd_placeLabel.top = new FormAttachment(0, 24);
+		placeLabel.setLayoutData(fd_placeLabel);
+		placeLabel.setText("虚拟机部署策略");
+		
+		Combo policyCombo = new Combo(placePolicyGp, SWT.NONE);
+		FormData fd_policyCombo = new FormData();
+		fd_policyCombo.top = new FormAttachment(0, 22);
+		fd_policyCombo.left = new FormAttachment(0, 117);
+		policyCombo.setLayoutData(fd_policyCombo);
+		
+		Label infoLabel = new Label(placePolicyGp, SWT.NONE);
+		FormData fd_infoLabel = new FormData();
+		fd_infoLabel.top = new FormAttachment(placeLabel, 28);
+		fd_infoLabel.left = new FormAttachment(placeLabel, 0, SWT.LEFT);
+		infoLabel.setLayoutData(fd_infoLabel);
+		infoLabel.setText("策略概述");
+		
+		policyText = new Text(placePolicyGp, SWT.BORDER);
+		FormData fd_policyText = new FormData();
+		fd_policyText.left = new FormAttachment(0, 22);
+		fd_policyText.right = new FormAttachment(100, -3);
+		fd_policyText.top = new FormAttachment(0, 88);
+		fd_policyText.bottom = new FormAttachment(100, -7);
+		policyText.setLayoutData(fd_policyText);
+		
+		Button button = new Button(placePolicyGp, SWT.NONE);
+		FormData fd_btnNewButton = new FormData();
+		fd_btnNewButton.top = new FormAttachment(placeLabel, -5, SWT.TOP);
+		fd_btnNewButton.right = new FormAttachment(policyCombo, 162, SWT.RIGHT);
+		fd_btnNewButton.left = new FormAttachment(policyCombo, 85);
+		button.setLayoutData(fd_btnNewButton);
+		button.setText("确认");
+		
+		final Group vmProvisorGp = new Group(composite, SWT.NONE);
+		FormData fd_vmProvisorGp = new FormData();
+		fd_vmProvisorGp.left = new FormAttachment(0, 3);
+		fd_vmProvisorGp.right = new FormAttachment(100, -3);
+		fd_vmProvisorGp.top = new FormAttachment(0, 0);
+		fd_vmProvisorGp.bottom = new FormAttachment(100, 0);
+		vmProvisorGp.setLayoutData(fd_vmProvisorGp);
+		vmProvisorGp.setText("虚拟机监测");
+		vmProvisorGp.setLayout(new FormLayout());
+		
+		Label lblNewLabel = new Label(vmProvisorGp, SWT.NONE);
+		FormData fd_lblNewLabel = new FormData();
+		fd_lblNewLabel.left = new FormAttachment(0, 3);
+		fd_lblNewLabel.top = new FormAttachment(0,0);
+		lblNewLabel.setLayoutData(fd_lblNewLabel);
+		lblNewLabel.setText("虚拟机资源配置");
+		
+		Label lblNewLabel_1 = new Label(vmProvisorGp, SWT.NONE);
+		FormData fd_lblNewLabel_1 = new FormData();
+		fd_lblNewLabel_1.bottom = new FormAttachment(54);
+		fd_lblNewLabel_1.left = new FormAttachment(0, 3);
+		fd_lblNewLabel_1.top = new FormAttachment(49);
+		
+		lblNewLabel_1.setLayoutData(fd_lblNewLabel_1);
+		lblNewLabel_1.setText("虚拟机资源利用");
+		
+		vmResourceTable = new Table(vmProvisorGp, SWT.BORDER | SWT.FULL_SELECTION);
+		FormData fd_vmResourceTable = new FormData();
+		fd_vmResourceTable.bottom = new FormAttachment(lblNewLabel_1);
+		fd_vmResourceTable.left = new FormAttachment(0, 3);
+		fd_vmResourceTable.right = new FormAttachment(100, -3);
+		fd_vmResourceTable.top = new FormAttachment(0, 20);
+		vmResourceTable.setLayoutData(fd_vmResourceTable);
+		vmResourceTable.setHeaderVisible(true);
+		vmResourceTable.setLinesVisible(true);
+		
+		TableColumn vmUserIdvR = new TableColumn(vmResourceTable, SWT.NONE);
+		vmUserIdvR.setWidth(74);
+		vmUserIdvR.setText("虚拟机用户");
+		
+		TableColumn vmIdvR = new TableColumn(vmResourceTable, SWT.NONE);
+		vmIdvR.setWidth(78);
+		vmIdvR.setText("虚拟机编号");
+		
+		TableColumn vmCpu = new TableColumn(vmResourceTable, SWT.NONE);
+		vmCpu.setWidth(68);
+		vmCpu.setText("CPU");
+		
+		TableColumn vmRam = new TableColumn(vmResourceTable, SWT.NONE);
+		vmRam.setWidth(72);
+		vmRam.setText("内存");
+		
+		TableColumn vmBw = new TableColumn(vmResourceTable, SWT.NONE);
+		vmBw.setWidth(65);
+		vmBw.setText("带宽");
+		
+		TableColumn vmStorage = new TableColumn(vmResourceTable, SWT.NONE);
+		vmStorage.setWidth(100);
+		vmStorage.setText("存储");
+		
+		vmUtilTable = new Table(vmProvisorGp, SWT.BORDER | SWT.FULL_SELECTION);
+		FormData fd_vmUtilTable = new FormData();
+		fd_vmUtilTable.top = new FormAttachment(lblNewLabel_1);
+		fd_vmUtilTable.left = new FormAttachment(0, 3);
+		fd_vmUtilTable.right = new FormAttachment(100, -3);
+		fd_vmUtilTable.bottom = new FormAttachment(100);
+		vmUtilTable.setLayoutData(fd_vmUtilTable);
+		vmUtilTable.setHeaderVisible(true);
+		vmUtilTable.setLinesVisible(true);
+		
+		TableColumn vmUserIdvU = new TableColumn(vmUtilTable, SWT.NONE);
+		vmUserIdvU.setWidth(73);
+		vmUserIdvU.setText("虚拟机用户");
+		
+		TableColumn vmIdvU = new TableColumn(vmUtilTable, SWT.NONE);
+		vmIdvU.setWidth(74);
+		vmIdvU.setText("虚拟机编号");
+		
+		TableColumn vmCpuUtil = new TableColumn(vmUtilTable, SWT.NONE);
+		vmCpuUtil.setWidth(78);
+		vmCpuUtil.setText("CPU利用率");
+		
+		TableColumn vmRamUtil = new TableColumn(vmUtilTable, SWT.NONE);
+		vmRamUtil.setWidth(76);
+		vmRamUtil.setText("内存利用率");
+		
+		TableColumn vmBwUtil = new TableColumn(vmUtilTable, SWT.NONE);
+		vmBwUtil.setWidth(73);
+		vmBwUtil.setText("带宽利用率");
+		
+		TableColumn vmStorageUtil = new TableColumn(vmUtilTable, SWT.NONE);
+		vmStorageUtil.setWidth(75);
+		vmStorageUtil.setText("存储利用率");
+		
+		final Group hostProvisorGp = new Group(composite, SWT.NONE);
+		FormData fd_hostProvisorGp = new FormData();
+		fd_hostProvisorGp.left = new FormAttachment(0, 3);
+		fd_hostProvisorGp.right = new FormAttachment(100, -3);
+		fd_hostProvisorGp.top = new FormAttachment(0, 0);
+		fd_hostProvisorGp.bottom = new FormAttachment(100);
+		hostProvisorGp.setLayoutData(fd_hostProvisorGp);
+		hostProvisorGp.setText("物理机监测");
+		hostProvisorGp.setLayout(new FormLayout());
+		
+		Label label = new Label(hostProvisorGp, SWT.NONE);
+		FormData fd_label = new FormData();
+		fd_label.right = new FormAttachment(0, 99);
+		fd_label.top = new FormAttachment(0, 3);
+		fd_label.left = new FormAttachment(0, 7);
+		label.setLayoutData(fd_label);
+		label.setText("物理机资源配置");
+		
+		hostResourceTable = new Table(hostProvisorGp, SWT.BORDER | SWT.FULL_SELECTION);
+		FormData fd_hostResourceTable = new FormData();
+		fd_hostResourceTable.top = new FormAttachment(label);
+		fd_hostResourceTable.left = new FormAttachment(0, 3);
+		fd_hostResourceTable.right = new FormAttachment(100, -3);
+		hostResourceTable.setLayoutData(fd_hostResourceTable);
+		hostResourceTable.setHeaderVisible(true);
+		hostResourceTable.setLinesVisible(true);
+		
+		TableColumn hostIdhR = new TableColumn(hostResourceTable, SWT.NONE);
+		hostIdhR.setWidth(79);
+		hostIdhR.setText("物理机编号");
+		
+		TableColumn numCpu = new TableColumn(hostResourceTable, SWT.NONE);
+		numCpu.setWidth(64);
+		numCpu.setText("总CPU数");
+		
+		TableColumn numRam = new TableColumn(hostResourceTable, SWT.NONE);
+		numRam.setWidth(70);
+		numRam.setText("总内存");
+		
+		TableColumn numBw = new TableColumn(hostResourceTable, SWT.NONE);
+		numBw.setWidth(69);
+		numBw.setText("总带宽");
+		
+		TableColumn numStorage = new TableColumn(hostResourceTable, SWT.NONE);
+		numStorage.setWidth(65);
+		numStorage.setText("总存储");
+		
+		TableColumn availableCpu = new TableColumn(hostResourceTable, SWT.NONE);
+		availableCpu.setWidth(74);
+		availableCpu.setText("可用CPU");
+		
+		TableColumn availableRam = new TableColumn(hostResourceTable, SWT.NONE);
+		availableRam.setWidth(100);
+		availableRam.setText("可用内存");
+		
+		TableColumn availableBw = new TableColumn(hostResourceTable, SWT.NONE);
+		availableBw.setWidth(100);
+		availableBw.setText("可用带宽");
+		
+		TableColumn availableStorage = new TableColumn(hostResourceTable, SWT.NONE);
+		availableStorage.setWidth(100);
+		availableStorage.setText("可用存储");
+		
+		Label label_1 = new Label(hostProvisorGp, SWT.NONE);
+		fd_hostResourceTable.bottom = new FormAttachment(label_1);
+		FormData fd_label_1 = new FormData();
+		fd_label_1.top = new FormAttachment(49);
+		fd_label_1.bottom = new FormAttachment(54);
+		fd_label_1.left = new FormAttachment(label, 0, SWT.LEFT);
+		label_1.setLayoutData(fd_label_1);
+		label_1.setText("物理机资源利用");
+		
+		hostUtilTable = new Table(hostProvisorGp, SWT.BORDER | SWT.FULL_SELECTION);
+		FormData fd_hostUtilTable = new FormData();
+		fd_hostUtilTable.top = new FormAttachment(label_1);
+		fd_hostUtilTable.bottom = new FormAttachment(100);
+		fd_hostUtilTable.left = new FormAttachment(0, 3);
+		fd_hostUtilTable.right = new FormAttachment(100, -3);
+		hostUtilTable.setLayoutData(fd_hostUtilTable);
+		hostUtilTable.setHeaderVisible(true);
+		hostUtilTable.setLinesVisible(true);
+		
+		TableColumn hostIdhU = new TableColumn(hostUtilTable, SWT.NONE);
+		hostIdhU.setWidth(77);
+		hostIdhU.setText("物理机编号");
+		
+		TableColumn hostCpuUtil = new TableColumn(hostUtilTable, SWT.NONE);
+		hostCpuUtil.setWidth(100);
+		hostCpuUtil.setText("CPU利用率");
+		
+		TableColumn hostRamUtil = new TableColumn(hostUtilTable, SWT.NONE);
+		hostRamUtil.setWidth(82);
+		hostRamUtil.setText("内存利用率");
+		
+		TableColumn hostBwUtil = new TableColumn(hostUtilTable, SWT.NONE);
+		hostBwUtil.setWidth(86);
+		hostBwUtil.setText("带宽利用率");
+		
+		TableColumn hostStorageUtil = new TableColumn(hostUtilTable, SWT.NONE);
+		hostStorageUtil.setWidth(100);
+		hostStorageUtil.setText("存储利用率");
+		
+		final Group vmGp = new Group(composite, SWT.NONE);
+		FormData fd_vmGp = new FormData();
+		fd_vmGp.left = new FormAttachment(0, 3);
+		fd_vmGp.right = new FormAttachment(100, -3);
+		fd_vmGp.top = new FormAttachment(0, 0);
+		fd_vmGp.bottom = new FormAttachment(100);
+		vmGp.setLayoutData(fd_vmGp);
+		vmGp.setText("虚拟机管理");
+		vmGp.setLayout(new FormLayout());
+		
+		vmToHost = new Table(vmGp, SWT.BORDER | SWT.FULL_SELECTION);
+		FormData fd_vmToHost = new FormData();
+		fd_vmToHost.left = new FormAttachment(0, 3);
+		fd_vmToHost.right = new FormAttachment(100, -3);
+		fd_vmToHost.top = new FormAttachment(0, 0);
+		fd_vmToHost.bottom = new FormAttachment(100, -25);
+		vmToHost.setLayoutData(fd_vmToHost);
+		vmToHost.setHeaderVisible(true);
+		vmToHost.setLinesVisible(true);
+		
+		TableColumn userId = new TableColumn(vmToHost, SWT.NONE);
+		userId.setWidth(100);
+		userId.setText("虚拟机用户");
+		
+		TableColumn vmId = new TableColumn(vmToHost, SWT.NONE);
+		vmId.setWidth(100);
+		vmId.setText("虚拟机编号");
+		
+		TableColumn hostId = new TableColumn(vmToHost, SWT.NONE);
+		hostId.setWidth(259);
+		hostId.setText("虚拟机所在物理机编号");
+		
+		final Group hostGp = new Group(composite, SWT.NONE);
+		FormData fd_hostGp = new FormData();
+		fd_hostGp.left = new FormAttachment(0, 3);
+		fd_hostGp.right = new FormAttachment(100, -3);
+		fd_hostGp.top = new FormAttachment(0, 0);
+		fd_hostGp.bottom = new FormAttachment(100);
+		hostGp.setLayoutData(fd_hostGp);
+		hostGp.setText("物理机管理");
+		hostGp.setLayout(new FormLayout());
+		
+		vmsInHost = new Table(hostGp, SWT.BORDER | SWT.FULL_SELECTION);
+		FormData fd_vmsInHost = new FormData();
+		fd_vmsInHost.left = new FormAttachment(0, 3);
+		fd_vmsInHost.right = new FormAttachment(100, -3);
+		fd_vmsInHost.top = new FormAttachment(0, 0);
+		fd_vmsInHost.bottom = new FormAttachment(100, -25);
+		vmsInHost.setLayoutData(fd_vmsInHost);
+		vmsInHost.setHeaderVisible(true);
+		vmsInHost.setLinesVisible(true);
+		
+		TableColumn hostId1 = new TableColumn(vmsInHost, SWT.NONE);
+		hostId1.setWidth(100);
+		hostId1.setText("物理机编号");
+		
+		TableColumn vmNum = new TableColumn(vmsInHost, SWT.NONE);
+		vmNum.setWidth(100);
+		vmNum.setText("虚拟机数量");
+		
+		TableColumn vmList = new TableColumn(vmsInHost, SWT.NONE);
+		vmList.setWidth(263);
+		vmList.setText("虚拟机编号列表");
+		
+		final Group dataCenterGp = new Group(composite, SWT.NONE);
+		FormData fd_dataCenterGp = new FormData();
+		fd_dataCenterGp.left = new FormAttachment(0, 3);
+		fd_dataCenterGp.right = new FormAttachment(100, -3);
+		fd_dataCenterGp.top = new FormAttachment(0, 0);
+		fd_dataCenterGp.bottom = new FormAttachment(100, -25);
+		dataCenterGp.setLayoutData(fd_dataCenterGp);
+		dataCenterGp.setText("数据中心概况");
+		dataCenterGp.setLayout(new FormLayout());
+		
+		Label lblHostNum = new Label(dataCenterGp, SWT.NONE);
+		FormData fd_lblHostNum = new FormData();
+		fd_lblHostNum.top = new FormAttachment(0, 27);
+		fd_lblHostNum.left = new FormAttachment(0, 7);
+		lblHostNum.setLayoutData(fd_lblHostNum);
+		lblHostNum.setText("物理机数量：");
+		
+		numOfHost = new Text(dataCenterGp, SWT.BORDER);
+		FormData fd_numOfHost = new FormData();
+		fd_numOfHost.top = new FormAttachment(0, 21);
+		fd_numOfHost.left = new FormAttachment(0, 105);
+		numOfHost.setLayoutData(fd_numOfHost);
+		
+		Label lblVmNum = new Label(dataCenterGp, SWT.NONE);
+		FormData fd_lblVmNum = new FormData();
+		fd_lblVmNum.top = new FormAttachment(0, 73);
+		fd_lblVmNum.left = new FormAttachment(0, 7);
+		lblVmNum.setLayoutData(fd_lblVmNum);
+		lblVmNum.setText("虚拟机数量：");
+		
+		numOfVm = new Text(dataCenterGp, SWT.BORDER);
+		FormData fd_numOfVm = new FormData();
+		fd_numOfVm.top = new FormAttachment(0, 67);
+		fd_numOfVm.left = new FormAttachment(0, 105);
+		numOfVm.setLayoutData(fd_numOfVm);
+		
+		bdInfo = new Table(dataCenterGp, SWT.BORDER | SWT.FULL_SELECTION);
+		FormData fd_bdInfo = new FormData();
+		fd_bdInfo.bottom = new FormAttachment(0, 313);
+		fd_bdInfo.right = new FormAttachment(0, 473);
+		fd_bdInfo.top = new FormAttachment(0, 173);
+		fd_bdInfo.left = new FormAttachment(0, 7);
+		bdInfo.setLayoutData(fd_bdInfo);
+		bdInfo.setHeaderVisible(true);
+		bdInfo.setLinesVisible(true);
+		
+		TableColumn bdCpu = new TableColumn(bdInfo, SWT.NONE);
+		bdCpu.setWidth(86);
+		bdCpu.setText("CPU");
+		
+		TableColumn bdRam = new TableColumn(bdInfo, SWT.NONE);
+		bdRam.setWidth(87);
+		bdRam.setText("内存");
+		
+		TableColumn bdBw = new TableColumn(bdInfo, SWT.NONE);
+		bdBw.setWidth(90);
+		bdBw.setText("带宽");
+		
+		TableColumn bdStorage = new TableColumn(bdInfo, SWT.NONE);
+		bdStorage.setWidth(94);
+		bdStorage.setText("存储");
+		
+		TableColumn bdDataCenter = new TableColumn(bdInfo, SWT.NONE);
+		bdDataCenter.setWidth(100);
+		bdDataCenter.setText("数据中心整体");
+		
+		Label lblBd = new Label(dataCenterGp, SWT.NONE);
+		FormData fd_lblBd = new FormData();
+		fd_lblBd.right = new FormAttachment(0, 98);
+		fd_lblBd.top = new FormAttachment(0, 150);
+		fd_lblBd.left = new FormAttachment(0, 7);
+		lblBd.setLayoutData(fd_lblBd);
+		lblBd.setText("资源利用均衡度");
+		
+		tree.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				//选择相应菜单项显示
+				Group[] groups={dataCenterGp,hostGp,vmGp,hostProvisorGp,vmProvisorGp,placePolicyGp,migrationGp,
+						placeLogGp,migrationLogGp};
+				TreeItem selectTreeItem=tree.getSelection()[0];
+				if(selectTreeItem==dataCenter){
+					for(int i=0;i<groups.length;i++){
+						if(i!=0)
+							groups[i].setVisible(false);
+						else
+							groups[i].setVisible(true);
+					}
+					
+				}else if(selectTreeItem==host){
+					for(int i=0;i<groups.length;i++){
+						if(i!=1)
+							groups[i].setVisible(false);
+						else
+							groups[i].setVisible(true);
+					}
+					
+				}else if(selectTreeItem==vm){
+					for(int i=0;i<groups.length;i++){
+						if(i!=2)
+							groups[i].setVisible(false);
+						else
+							groups[i].setVisible(true);
+					}
+				}else if(selectTreeItem==hostProvisor){
+					for(int i=0;i<groups.length;i++){
+						if(i!=3)
+							groups[i].setVisible(false);
+						else
+							groups[i].setVisible(true);
+					}
+					
+				}else if(selectTreeItem==vmProvisor){
+					for(int i=0;i<groups.length;i++){
+						if(i!=4)
+							groups[i].setVisible(false);
+						else
+							groups[i].setVisible(true);
+					}
+				}else if(selectTreeItem==placePolicy){
+					for(int i=0;i<groups.length;i++){
+						if(i!=5)
+							groups[i].setVisible(false);
+						else
+							groups[i].setVisible(true);
+					}
+					
+				}else if(selectTreeItem==migrationPolicy){
+					for(int i=0;i<groups.length;i++){
+						if(i!=6)
+							groups[i].setVisible(false);
+						else
+							groups[i].setVisible(true);
+					}
+				}else if(selectTreeItem==placeLog){
+					for(int i=0;i<groups.length;i++){
+						if(i!=7)
+							groups[i].setVisible(false);
+						else
+							groups[i].setVisible(true);
+					}
+					
+				}else if(selectTreeItem==migrationLog){
+					for(int i=0;i<groups.length;i++){
+						if(i!=8)
+							groups[i].setVisible(false);
+						else
+							groups[i].setVisible(true);
+					}
+				}
+				
+			}
+		});
+		sashForm.setWeights(new int[] {1, 3});
+	}
+}

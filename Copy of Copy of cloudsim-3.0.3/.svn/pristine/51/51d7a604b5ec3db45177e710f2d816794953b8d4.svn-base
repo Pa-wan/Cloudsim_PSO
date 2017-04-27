@@ -1,0 +1,380 @@
+package org.cloudbus.cloudsim.hust.ant;
+
+import java.util.HashMap;
+import java.util.Random;
+import java.util.Vector;
+
+import org.cloudbus.cloudsim.hust.base.PhysicalMachine;
+import org.cloudbus.cloudsim.hust.base.VirtualMachine;
+import org.cloudbus.cloudsim.hust.utils.Utils;
+
+
+public class Ant {
+	static Utils utils;
+
+	private double[][] distance; // 距离矩阵，这个是全局的动态变化的，每只蚂蚁部署完之后都要进行更新
+	
+	private double[][] delta; // 信息素变化矩阵，每只蚂蚁私有的
+	
+	//存放每个虚拟机对应的可以部署的物理机列表
+	HashMap<Integer,Vector<Integer>>allowedMap;
+	
+	//存放物理机与虚拟机的映射关系表
+	HashMap<Integer,Vector<Integer>>deployMap;
+	
+	//物理机资源的初始资源量，保存下来，便于计算负载不均衡度
+	PhysicalMachine [] origin_pm;
+	VirtualMachine  [] origin_vm;
+	
+	public static PhysicalMachine [] physicalMachine;
+	public static VirtualMachine  []  virtualMachine;
+	
+	//归一化的资源
+	PhysicalMachine [] pm_normalized ;
+	VirtualMachine  [] vm_normalized;
+
+	private double alpha;
+	private double beta;
+	
+	Random random=new Random();
+	
+	Vector<Integer> deploySequence;//每只蚂蚁每次循环输出一个方案
+
+	//初始化
+	public Ant(VirtualMachine[] vm, PhysicalMachine[] pm) {
+		utils = new Utils();
+		
+		this.origin_pm=pm.clone();
+		this.origin_vm=vm.clone();
+		
+		this.virtualMachine = vm.clone();
+		this.physicalMachine = pm.clone();
+
+		
+		//对虚拟机进行归一化,虚拟机的归一化结果始终保持不变
+		this.pm_normalized=new PhysicalMachine[this.physicalMachine.length];
+		
+		this.vm_normalized=new VirtualMachine[this.virtualMachine.length];
+		
+	}
+
+	/**
+	 * 初始化蚂蚁，随机选择起始位置
+	 * @param distance 性能匹配矩阵
+	 * @param alpha  beta 信息素系数
+	 * @param   antNum  蚂蚁数量
+	 */
+	public void init(float alpha, float beta, int antNum) {
+		
+		this.alpha = alpha;
+		this.beta = beta;
+
+		int size_pm = physicalMachine.length;
+		int size_vm = virtualMachine.length;
+		int indexVm,indexPm;
+		
+		//使用前，进行归一化
+		this.vm_normalized=getNormalized_Vm().clone();
+		this.pm_normalized=getNormalized_Pm().clone();
+		
+		this.delta=new double[size_vm][size_pm];
+		
+		this.distance=new double[size_vm][size_pm];
+		
+		this.deploySequence=new Vector<Integer>(size_vm);
+		
+		this.deployMap=new HashMap<Integer,Vector<Integer>>();
+		
+		//初始化:【1】每台虚拟机的候选物理机列表,【2】距离匹配矩阵,【3】信息素矩阵
+		this.allowedMap=new HashMap<Integer,Vector<Integer>>();
+		
+		for(indexVm=0;indexVm<size_vm;indexVm++){
+			VirtualMachine vm=this.virtualMachine[indexVm];
+			Integer key=indexVm;
+			Vector<Integer>value;
+			for(indexPm=0;indexPm<size_pm;indexPm++){
+				PhysicalMachine pm=this.physicalMachine[indexPm];
+				if(utils.canDeployDirectly(pm, vm)){
+				//【1】放入虚拟机的物理机列表
+					value=this.allowedMap.get(key);
+					if(value==null)
+						value=new Vector<Integer>();
+					value.add(indexPm);
+				 this.allowedMap.put(key, value);
+				 
+				//【2】计算匹配距离
+				 this.distance[indexVm][indexPm]=getMatchDistance(this.pm_normalized[indexPm],this.vm_normalized[indexVm]);
+				}
+				
+				 else  //无法放置，设置距离为0
+					this.distance[indexVm][indexPm]=0;
+				//【3】初始化信息素矩阵
+				this.delta[indexVm][indexPm]=0;
+			}
+		}
+		
+		//计算物理机与虚拟机之间的距离匹配矩阵
+		
+		//初始化信息素矩阵
+		
+		//在第一个虚拟机可用物理机列表中随机选择一个作为开始
+		Random random=new Random();
+		
+		Vector<Integer>pmSet=allowedMap.get(0); //第一个虚拟机的物理机列表
+		int pm_size=pmSet.size();  //物理机集合的长度
+		
+		int randomIndex=random.nextInt(pm_size); //随机获取物理机的下标
+		int firstPmIndex=pmSet.get(randomIndex); //根据随机下标，获取物理机编号
+		
+		deploySequence.add(firstPmIndex);//加入选择序列
+		updateDistance(this.virtualMachine,firstPmIndex,0);//更新除去vmIndex虚拟机以外的距离矩阵
+		
+		//更新【物理机---虚拟机】映射关系表
+		Vector<Integer>value=this.deployMap.get(firstPmIndex);
+		if(value==null)
+			value=new Vector<Integer>();
+		value.add(0); //第一台虚拟机
+		this.deployMap.put(firstPmIndex, value); 
+	}
+	
+	public boolean selectNext(VirtualMachine[] virtualMachine,double[][] pheromone,int vmIndex){
+		int pm_size=this.physicalMachine.length;
+		double array[]=new double[pm_size];
+		double sum=0;
+		double probability[]=new double[pm_size];
+		
+		//获取虚拟机的可用物理机列表，这个列表在上一轮选择中已经得到更新
+		Vector<Integer> allowedPmSet= allowedMap.get(vmIndex);
+		
+		//计算转移概率
+		for(Integer pmIndex:allowedPmSet){
+			array[pmIndex]=Math.pow(pheromone[vmIndex][pmIndex], alpha)* Math.pow(distance[vmIndex][pmIndex], beta);
+			sum+=array[pmIndex];
+		}
+		
+		for(Integer pmIndex:allowedPmSet){
+			probability[pmIndex]=array[pmIndex]/sum;
+		}
+		
+		//使用轮盘法为虚拟机vmIndex，选择下一个物理机
+		int selectIndex=getRouletteIndex(allowedPmSet,vmIndex,probability);
+		
+		if(selectIndex==-1)  //选择失败
+			return false;
+		else{     //选择成功
+			deploySequence.add(selectIndex);//加入选择序列
+			
+			//计入物理机虚拟机映射表中
+			Vector<Integer>value=this.deployMap.get(selectIndex);
+			if(value==null)
+				value=new Vector<Integer>();
+			value.add(vmIndex);
+			this.deployMap.put(selectIndex, value);
+			return true;
+		}
+	}
+	
+	/**
+	 * 轮盘算子
+	 * @param allowedPmSet  虚拟机允许访问的物理机集合
+	 * @param vmIndex       虚拟机编号
+	 * @param array         概率数组
+	 * @return              虚拟机下一步选择的物理机编号
+	 */
+	public int getRouletteIndex(Vector<Integer> allowedPmSet,int vmIndex,double[]array){
+		Random random=new Random();
+		double selectP=random.nextDouble();
+		int selectIndex=-1;
+		double sum=0;
+		for(Integer pmIndex:allowedPmSet){
+			sum+=array[pmIndex];
+			if(sum>=selectP){
+				selectIndex=pmIndex;
+				//更新除去vmIndex虚拟机以外的距离矩阵
+				updateDistance(virtualMachine,pmIndex, vmIndex);
+				break;
+			}
+		}
+		return selectIndex;
+	}
+	
+	/**
+	 * @param virtualMachine 虚拟机列表
+	 * @param pmIndex 物理机编号
+	 * @param vmIndex 虚拟机编号
+	 * 虚拟机vmIndex已经部署到编号为pmIndex的主机上
+	 */
+	public void updateDistance(VirtualMachine[] virtualMachine,int pmIndex, int vmIndex){
+		//当虚拟机vmIndex部署到物理机pmIndex时，进行资源更新
+		this.physicalMachine[pmIndex]=new PhysicalMachine(utils.getDiffArray(this.physicalMachine[pmIndex], virtualMachine[vmIndex]));
+		
+		//在资源更新后，重新对物理机资源进行归一化
+		this.pm_normalized=getNormalized_Pm();
+		
+		//更新除去vmIndex虚拟机以外的距离矩阵
+		for (int index = vmIndex+1; index < virtualMachine.length; index++) {// 遍历虚拟机列表
+			// 若可以部署在该物理机上,重新计算匹配距离
+			if (utils.canDeployDirectly(this.physicalMachine[pmIndex], virtualMachine[index])) {// 先判断是否合适，合适就更新，否则直接移除
+				//重新计算物理机与虚拟机之间的匹配距离
+				distance[index][pmIndex] = getMatchDistance(this.pm_normalized[pmIndex],this.vm_normalized[vmIndex]);
+			}
+			//若不可以部署在该物理机上
+			else{
+				Vector<Integer>value=allowedMap.get(index);
+				//并且在虚拟机的候选物理机部署列表中
+				if(value.contains(pmIndex)){
+					//将物理机从虚拟机的可部署列表中删除
+					value.removeElement(pmIndex); //注意这里不能够使用value.remove(pmIndex);会出现数组越界
+					allowedMap.put(index, value);
+				}
+			}
+		}
+	}
+
+	//计算公式,负载不均衡度值在[0,1]之间
+		public double getLoadDegree() {
+			// 【1】求出每种资源R的平均资源利用率
+			double sum_usedCpu, sum_usedMemory, sum_usedBandwidth, sum_usedDisk; // 每一类资源的总的剩余量
+			double aveCpu, aveMemory, aveBandwidth, aveDisk; // 每一类资源的平均利用率
+			sum_usedCpu = sum_usedMemory = sum_usedBandwidth = sum_usedDisk = 0.0; // 剩余资源累加计数器
+			int index, size;
+			size = this.origin_pm.length;
+
+			for (index = 0; index < size; index++) {
+				PhysicalMachine origin_resource, current_resource;
+				origin_resource = this.origin_pm[index]; // 取出使用未使用过的物理机的状态
+				// 【Bug_1】
+				current_resource = this.physicalMachine[index]; // 取出使用了的物理机的状态。
+				sum_usedCpu += (origin_resource.getCpu() - current_resource.getCpu())/origin_resource.getCpu();
+				sum_usedMemory += (origin_resource.getMemory() - current_resource.getMemory())/origin_resource.getMemory();
+				sum_usedBandwidth += (origin_resource.getBandwidth() - current_resource.getBandwidth())/origin_resource.getBandwidth();
+				sum_usedDisk += (origin_resource.getDisk() - current_resource.getDisk())/origin_resource.getDisk();
+			}
+			aveCpu = sum_usedCpu /size; // CPU资源的平均利用率
+			aveMemory = sum_usedMemory / size;// 内存的平均利用率
+			aveBandwidth = sum_usedBandwidth / size;// 带宽资源的平均利用率
+			aveDisk = sum_usedDisk / size;// 硬盘资源的平均利用率
+
+			// 【2】再次遍历,求出负载不均衡度
+			double per_usedCpu, per_usedMemory, per_usedBandwidth, per_usedDisk; // 每一类资源的剩余量
+			per_usedCpu = per_usedMemory = per_usedBandwidth = per_usedDisk = 0;
+			double currsum = 0;
+			for (index = 0; index < size; index++) {
+				PhysicalMachine origin_resource, current_resource;
+				origin_resource = this.origin_pm[index]; // 取出使用未使用过的物理机的状态
+				current_resource = this.physicalMachine[index]; // 取出使用了的物理机的状态。
+				per_usedCpu = (origin_resource.getCpu() - current_resource.getCpu())/origin_resource.getCpu();
+				per_usedMemory = (origin_resource.getMemory() - current_resource.getMemory())/origin_resource.getMemory();
+				per_usedBandwidth = (origin_resource.getBandwidth() - current_resource.getBandwidth())/origin_resource.getBandwidth();
+				per_usedDisk = (origin_resource.getDisk() - current_resource.getDisk())/origin_resource.getDisk();
+				currsum += (Math.abs(per_usedCpu - aveCpu) + Math.abs(per_usedMemory - aveMemory)
+						+ Math.abs(per_usedBandwidth - aveBandwidth) + Math.abs(per_usedDisk - aveDisk));
+			}
+			return currsum / size; // 求出负载不均衡度
+		}
+
+		/**
+		 * 物理机性能的归一化
+		 * @param physicalMachine  物理机
+		 * @return  归一化的物理机性能
+		 */
+		public static  PhysicalMachine [] getNormalized_Pm(){
+			// 获取物理主机列表中各物理主机性能参数的最大值与最小值
+			double[][] arrayA = PhysicalMachine.findMaxMin(physicalMachine);
+
+			int size_pm, index;
+			size_pm = physicalMachine.length;
+			
+			PhysicalMachine [] result_Pm=new PhysicalMachine [size_pm];
+
+			// 进行归一化处理，将处理前和处理后的结果放在一个映射表中，方便记录原始数据和变化后的数据
+			// 主机性能归一化
+			for (index = 0; index < size_pm; index++) {
+				PhysicalMachine ele = physicalMachine[index];
+				double normalizedCPU =(arrayA[0][0] - arrayA[1][0])==0?1: (ele.getCpu() - arrayA[1][0]) / (arrayA[0][0] - arrayA[1][0]);
+				double normalizedMEM = (arrayA[0][1] - arrayA[1][1])==0?1:(ele.getMemory() - arrayA[1][1]) / (arrayA[0][1] - arrayA[1][1]);
+				double normalizedBandwidth = (arrayA[0][2] - arrayA[1][2])==0?1:(ele.getBandwidth() - arrayA[1][2]) / (arrayA[0][2] - arrayA[1][2]);
+				double normalizedDisksize = (arrayA[0][3] - arrayA[1][3])==0?1:(ele.getDisk() - arrayA[1][3]) / (arrayA[0][3] - arrayA[1][3]);
+				result_Pm[index] = new PhysicalMachine(normalizedCPU, normalizedMEM, normalizedBandwidth,
+						normalizedDisksize);
+			}
+			return result_Pm;
+		  }
+		
+		/**
+		 * 虚拟机性能的归一化
+		 * @param physicalMachine  虚拟机
+		 * @return  归一化的虚拟机性能
+		 */
+		  public static  VirtualMachine [] getNormalized_Vm(){
+				// 获取物理主机列表中各虚拟机性能参数的最大值与最小值
+				double[][] arrayB = VirtualMachine.findMaxMin(virtualMachine);
+
+				int size_vm, index;
+				size_vm =virtualMachine.length;
+				
+				VirtualMachine [] result_Pm=new VirtualMachine [size_vm];
+
+				// 进行归一化处理，将处理前和处理后的结果放在一个映射表中，方便记录原始数据和变化后的数据
+				// 虚拟机性能归一化
+				for (index = 0; index < size_vm; index++) {
+					VirtualMachine ele =virtualMachine[index];
+					double normalizedCPU =(arrayB[0][0] - arrayB[1][0])==0?1: (ele.getCpu() - arrayB[1][0]) / (arrayB[0][0] - arrayB[1][0]);
+					double normalizedMEM = (arrayB[0][1] - arrayB[1][1])==0?1:(ele.getMemory() - arrayB[1][1]) / (arrayB[0][1] - arrayB[1][1]);
+					double normalizedBandwidth = (arrayB[0][2] - arrayB[1][2])==0?1:(ele.getBandwidth() - arrayB[1][2]) / (arrayB[0][2] - arrayB[1][2]);
+					double normalizedDisksize = (arrayB[0][3] - arrayB[1][3])==0?1:(ele.getDisk() - arrayB[1][3]) / (arrayB[0][3] - arrayB[1][3]);
+					result_Pm[index] = new VirtualMachine(normalizedCPU, normalizedMEM, normalizedBandwidth,
+							normalizedDisksize);
+				}
+				return result_Pm;
+		}
+		 
+		/**
+		 * @param pm_normalized 归一化的物理机资源
+		 * @param vm_normalized 归一化的虚拟机资源
+		 * @return  匹配距离值 ，匹配距离越小，越能满足性能需求
+		 */
+		public static double getMatchDistance(PhysicalMachine pm_normalized,VirtualMachine vm_normalized){
+			double sum = 0; // 累加和
+			double absdiff_1 = Math.abs(pm_normalized.getCpu() - vm_normalized.getCpu());
+			double absdiff_2 = Math.abs(pm_normalized.getMemory() - vm_normalized.getMemory());
+			double absdiff_3 = Math.abs(pm_normalized.getBandwidth() - vm_normalized.getBandwidth());
+			double absdiff_4 = Math.abs(pm_normalized.getDisk() - vm_normalized.getDisk());
+			sum += Math.pow(absdiff_1, 2.0) + Math.pow(absdiff_2, 2.0) + Math.pow(absdiff_3, 2.0)
+					+ Math.pow(absdiff_4, 2.0);
+			return Math.sqrt(sum)/2;
+		}
+		
+		public double[][] getDelta() {
+			return delta;
+		}
+
+		public void setDelta(double[][] delta) {
+			this.delta = delta;
+		}
+
+		public HashMap<Integer, Vector<Integer>> getDeployMap() {
+			return deployMap;
+		}
+
+		public void setDeployMap(HashMap<Integer, Vector<Integer>> deployMap) {
+			this.deployMap = deployMap;
+		}
+
+		public PhysicalMachine[] getPhysicalMachine() {
+			return physicalMachine;
+		}
+
+		public void setPhysicalMachine(PhysicalMachine[] physicalMachine) {
+			this.physicalMachine = physicalMachine;
+		}
+
+		public Vector<Integer> getDeploySequence() {
+			return deploySequence;
+		}
+
+		public void setDeploySequence(Vector<Integer> deploySequence) {
+			this.deploySequence = deploySequence;
+		}
+		
+}

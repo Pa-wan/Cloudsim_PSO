@@ -1,0 +1,62 @@
+package org.cloudbus.cloudsim.hust.acopso;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+
+public class Utils {
+	public  static boolean isSuitable(Vm vm, Host host) {
+		if(vm.getCurrentRequestedTotalMips()<=host.getAvailableMips()&& 
+			vm.getCurrentRequestedRam()<=host.getRamProvisioner().getAvailableRam()&& 
+			vm.getSize()<=host.getStorage()&& 
+			vm.getCurrentRequestedBw()<=host.getBwProvisioner().getAvailableBw())
+			return true;
+		
+		return false;
+	}
+	
+	public static double calcuDistance(Vm vm, Host host) {
+		//向量夹角余弦
+		double sum=host.getAvailableMips()*vm.getCurrentRequestedTotalMips()+
+				host.getRamProvisioner().getAvailableRam()*vm.getCurrentRequestedRam()+
+		          host.getStorage()*vm.getSize()+
+		          host.getBwProvisioner().getAvailableBw()*vm.getCurrentRequestedBw();
+		
+		double sum1=Math.sqrt(Math.pow(host.getAvailableMips(), 2)+	
+				Math.pow(host.getRamProvisioner().getAvailableRam(), 2)+
+		 Math.pow(host.getStorage(), 2)+Math.pow(host.getBwProvisioner().getAvailableBw(), 2));
+		
+		double sum2=Math.sqrt(Math.pow(vm.getCurrentRequestedTotalMips(), 2)+
+				Math.pow(vm.getCurrentRequestedRam(), 2)+
+		   Math.pow(vm.getSize(), 2)+Math.pow(vm.getCurrentRequestedBw(), 2));
+		
+		return sum/sum1/sum2;
+		
+	}
+	
+	/*public static Host deepCopy(Host src) throws Exception{
+		ByteArrayOutputStream bo = new ByteArrayOutputStream();
+		ObjectOutputStream oo = new ObjectOutputStream(bo);
+		oo.writeObject(src);
+		ByteArrayInputStream bi = new ByteArrayInputStream(bo.toByteArray());
+		ObjectInputStream oi = new ObjectInputStream(bi);
+		Host dis=(Host)oi.readObject();
+		return dis;
+	}
+	
+	public static Vm deepCopy(Vm src) throws Exception{
+		ByteArrayOutputStream bo = new ByteArrayOutputStream();
+		ObjectOutputStream oo = new ObjectOutputStream(bo);
+		oo.writeObject(src);
+		ByteArrayInputStream bi = new ByteArrayInputStream(bo.toByteArray());
+		ObjectInputStream oi = new ObjectInputStream(bi);
+		Vm dis=(Vm)oi.readObject();
+		return dis;
+	}*/
+	
+}
+

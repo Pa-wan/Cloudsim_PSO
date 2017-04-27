@@ -1,0 +1,357 @@
+package org.cloudbus.cloudsim.hust.aco;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
+import org.cloudbus.cloudsim.policy.utils.ExtHelper;
+
+public class CopyAnt {
+	private Map<String,ArrayList<Host>> allowed;//可以满足该虚拟机的物理机候选表
+	private Map<Integer,ArrayList<Vm>> update;//可以满足该物理机的虚拟机列表
+	private double[][] delta; // 信息素变化矩阵
+	private double[][] distance; //资源匹配距离矩阵
+	private double alpha;
+	private double beta;
+	private double banlanceDegree;//总体不均衡度
+	private int bestLoad;//最佳负载区间物理机数量
+	private Map<String,Integer> vmTohost;//每只蚂蚁每次循环输出一个方案
+	private List<Host> hostList;
+	private List<Vm> vmList;
+	
+	private double util[][];//利用率矩阵
+	private double utilAvg[];//单个物理机平均利用率向量
+	private double outerStd;//外部方差和
+	private double innerStd;//内部方差和
+	private Map<Integer,Long> storageMap;//物理机固有的存储，Host类中不保存该值
+	
+	/**
+	 * 初始化工作
+	 * @param vms
+	 * @param hosts
+	 * @param dis
+	 * @param allowe
+	 * @param updat
+	 */
+	public void init(List<Vm> vms,List<Host> hosts,double[][] dis,Map<String,ArrayList<Host>> allowe,Map<Integer,ArrayList<Vm>> updat) {
+		this.alpha=ACO.alpha;
+		this.beta=ACO.beta;
+		banlanceDegree=0;
+		bestLoad=0;
+		outerStd=0;
+		innerStd=0;
+		
+		Map<Integer,Host> hostById=new HashMap<Integer, Host>();
+		Map<String,Vm> vmByUid=new HashMap<String, Vm>();
+		storageMap=new HashMap<Integer, Long>();
+		hostList=ExtHelper.createHostList(hosts.size()); //创建物理机
+		vmList = ExtHelper.createVmList(Main.brokerId,vms.size());
+		Iterator<Host> ithost=hostList.iterator();
+		Iterator<Vm> itvm=vms.iterator();
+		try {
+			while (ithost.hasNext()) {
+				Host host = ithost.next();
+				hostById.put(host.getId(), host);
+				storageMap.put(host.getId(), host.getStorage());
+			}
+			while (itvm.hasNext()) {
+				Vm vm = itvm.next();
+				vmByUid.put(vm.getUid(), vm);
+			}
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		int vmNum=vms.size();
+		int hostNum=hosts.size();
+		distance=new double[vmNum][hostNum];
+		delta=new double[vmNum][hostNum];
+		vmTohost=new HashMap<String, Integer>();
+		allowed=new HashMap<String,ArrayList<Host>>();
+		update=new HashMap<Integer,ArrayList<Vm>>();
+		for(Vm vm:vmList){                        //每台虚拟机的物理机候选表副本
+			ArrayList<Host>  temp=new ArrayList<Host>();
+			for(Host host:allowe.get(vm.getUid())){
+				temp.add(hostById.get(host.getId()));//此处添加副本
+			}
+			allowed.put(vm.getUid(), temp);
+		}
+		for(Host host:hostList){//计算资源匹配距离
+			ArrayList<Vm> temp=new ArrayList<Vm>();
+			for(Vm vm:updat.get(host.getId())){
+				temp.add(vmByUid.get(vm.getUid()));//此处添加副本
+			}
+			update.put(host.getId(), temp);
+			for(Vm vm:vmList){
+				distance[vm.getId()][host.getId()]=dis[vm.getId()][host.getId()];
+				delta[vm.getId()][host.getId()]=0;//初始化信息素变化矩阵
+			}
+		}
+	}
+	/**
+	 * 产生问题的可行解，并计算该解的度量指标
+	 */
+	public boolean run(){
+		for(Vm vm:vmList){
+			if(!selectHost(vm))
+				return false;
+		}
+		calcuMd();
+		return true;
+	}
+	/**
+	 * 选择物理机部署vm
+	 * @param vm
+	 * @return
+	 */
+	private boolean selectHost(Vm vm){
+		double[][] pheromone=ACO.getPheromone();
+		double p[]=new double[hostList.size()];//选择概率
+		double sum=0;//计算公式分母
+		double choice[]=new double[hostList.size()];//计算公式分子
+		ArrayList<Host> allowedlist= allowed.get(vm.getUid());
+		//计算选择概率
+		for(Host host:allowedlist){
+			choice[host.getId()]=Math.pow(pheromone[vm.getId()][host.getId()], alpha)
+			* Math.pow(distance[vm.getId()][host.getId()], beta);
+			sum+=choice[host.getId()];
+		}
+		
+		for(Host host:allowedlist){
+			p[host.getId()]=choice[host.getId()]/sum;
+		}
+		
+		//轮盘赌选择一个物理机
+		Random random=new Random();
+		double temp=random.nextDouble();
+		Host selectHost=null;
+		double tempSum=0;
+		for(Host host:allowedlist){
+			tempSum+=p[host.getId()];
+			if(tempSum>=temp){
+				selectHost=host;
+				updateResource(host,vm);//更新距离矩阵
+				break;
+			}
+		}
+		if(selectHost==null)
+			return false;
+		else{
+			vmTohost.put(vm.getUid(),selectHost.getId());//加入选择序列
+			return true;
+		}
+	}
+	/**
+	 * 更新相关资源，中间存储结构
+	 * @param host
+	 * @param vm
+	 */
+	private void updateResource(Host host,Vm vm){
+		host.vmCreate(vm);//更新资源，CurrentAllocatedMips,CurrentAllocatedSize
+		vm.setCurrentAllocatedSize(vm.getSize());
+		List<Double> list=new ArrayList<Double>();
+		list.add(vm.getCurrentRequestedTotalMips());
+		vm.setCurrentAllocatedMips(list);
+		ArrayList<Host> hostlist=allowed.get(vm.getUid());
+		for(Host h:hostlist)
+			update.get(h.getId()).remove(vm);
+		
+		Iterator<Vm> it=update.get(host.getId()).iterator();
+		while(it.hasNext()){
+			Vm v=it.next();
+			if(Utils.isSuitable(v, host)){// 先判断是否合适，合适就更新，否则直接移除
+				double s=Utils.calcuDistance(v, host);
+				distance[v.getId()][host.getId()]=s;//维护匹配距离
+			}else{
+				allowed.get(v.getUid()).remove(host);//维护allowed
+				it.remove();//维护update
+			}
+		}
+	}
+
+	/**
+	 * 计算总体均衡程度
+	 */
+	private void calcuMd(){
+		util=new double[hostList.size()][4];
+		utilAvg=new double[hostList.size()];
+		double[] std=new double[hostList.size()];
+		double avg[]=new double[4];
+		double sumCpu=0,sumMem=0,sumBw=0,sumStorage=0;
+		
+		for(Host host:hostList){
+			double temp=0;
+			util[host.getId()][0]=(host.getTotalMips()-host.getAvailableMips())/host.getTotalMips();
+			util[host.getId()][1]=host.getRamProvisioner().getUsedRam()/(host.getRam()+0.0);
+			util[host.getId()][2]=host.getBwProvisioner().getUsedBw()/(host.getBw()+0.0);
+			util[host.getId()][3]=(storageMap.get(host.getId())-host.getStorage())/(storageMap.get(host.getId())+0.0);
+			
+			sumCpu+=util[host.getId()][0];
+			sumMem+=util[host.getId()][1];
+			sumBw+=util[host.getId()][2];
+			sumStorage+=util[host.getId()][3];
+			
+			boolean flag=false;
+			for(int i=0;i<4;i++){
+				if(!(util[host.getId()][i]<=0.9&&util[host.getId()][i]>=0.1)){
+					flag=true;
+					break;
+				}
+			}
+			if(!flag){
+				bestLoad++;
+			}
+			utilAvg[host.getId()]=(util[host.getId()][0]+util[host.getId()][1]+util[host.getId()][2]+util[host.getId()][3])/4;
+			for(int i=0;i<4;i++){
+				temp+=Math.pow(util[host.getId()][i]-utilAvg[host.getId()], 2);
+			}
+			std[host.getId()]=Math.sqrt(temp/4);
+			innerStd+=std[host.getId()];
+		}
+		
+		avg[0]=sumCpu/(hostList.size());
+		avg[1]=sumMem/(hostList.size());
+		avg[2]=sumBw/(hostList.size());
+		avg[3]=sumStorage/(hostList.size());
+		for(Host host:hostList){
+			double temp=0;
+			for(int i=0;i<4;i++){
+				temp+=Math.pow(util[host.getId()][i]-avg[i], 2);
+			}
+			//outerStd+=Math.sqrt(temp);
+			outerStd+=temp;
+		}
+		//banlanceDegree=(innerStd+outerStd)/hostList.size();//改进评价指标，引入内部资源方差
+		banlanceDegree=Math.sqrt(outerStd/hostList.size()/4);
+	}
+
+	
+
+	public Map<String, ArrayList<Host>> getAllowed() {
+		return allowed;
+	}
+
+	public void setAllowed(Map<String, ArrayList<Host>> allowed) {
+		this.allowed = allowed;
+	}
+
+	public Map<Integer, ArrayList<Vm>> getUpdate() {
+		return update;
+	}
+
+	public void setUpdate(Map<Integer, ArrayList<Vm>> update) {
+		this.update = update;
+	}
+
+	public List<Vm> getVmList() {
+		return vmList;
+	}
+
+	public void setVmList(ArrayList<Vm> vmList) {
+		this.vmList = vmList;
+	}
+
+	public double[][] getDelta() {
+		return delta;
+	}
+
+	public void setDelta(double[][] delta) {
+		this.delta = delta;
+	}
+
+	public double[][] getDistance() {
+		return distance;
+	}
+
+	public void setDistance(double[][] distance) {
+		this.distance = distance;
+	}
+
+	public double getAlpha() {
+		return alpha;
+	}
+
+	public void setAlpha(double alpha) {
+		this.alpha = alpha;
+	}
+
+	public double getBeta() {
+		return beta;
+	}
+
+	public void setBeta(double beta) {
+		this.beta = beta;
+	}
+
+	public double getBanlanceDegree() {
+		return banlanceDegree;
+	}
+
+	public void setBanlanceDegree(double banlanceDegree) {
+		this.banlanceDegree = banlanceDegree;
+	}
+
+	public int getBestLoad() {
+		return bestLoad;
+	}
+
+	public void setBestLoad(int bestLoad) {
+		this.bestLoad = bestLoad;
+	}
+
+	public Map<String, Integer> getVmTohost() {
+		return vmTohost;
+	}
+
+	public void setVmTohost(Map<String, Integer> vmTohost) {
+		this.vmTohost = vmTohost;
+	}
+
+	public List<Host> getHostList() {
+		return hostList;
+	}
+
+	public void setHostList(ArrayList<Host> hostList) {
+		this.hostList = hostList;
+	}
+
+	public double[][] getUtil() {
+		return util;
+	}
+
+	public void setUtil(double[][] util) {
+		this.util = util;
+	}
+
+	public double[] getUtilAvg() {
+		return utilAvg;
+	}
+
+	public void setUtilAvg(double[] utilAvg) {
+		this.utilAvg = utilAvg;
+	}
+
+	public double getOuterStd() {
+		return outerStd;
+	}
+
+	public void setOuterStd(double outerStd) {
+		this.outerStd = outerStd;
+	}
+
+	public double getInnerStd() {
+		return innerStd;
+	}
+
+	public void setInnerStd(double innerStd) {
+		this.innerStd = innerStd;
+	}
+
+	
+}

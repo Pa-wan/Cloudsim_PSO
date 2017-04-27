@@ -1,0 +1,251 @@
+/*
+ * Title:        CloudSim Toolkit
+ * Description:  CloudSim (Cloud Simulation) Toolkit for Modeling and Simulation
+ *               of Clouds
+ * Licence:      GPL - http://www.gnu.org/copyleft/gpl.html
+ *
+ * Copyright (c) 2009, The University of Melbourne, Australia
+ */
+
+
+package org.cloudbus.cloudsim.policy.VmsToHosts;
+
+import java.text.DecimalFormat;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Vector;
+import java.util.TreeMap;
+
+import org.cloudbus.cloudsim.Cloudlet;
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Log;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.VmAllocationPolicy;
+import org.cloudbus.cloudsim.core.CloudSim;
+import org.cloudbus.cloudsim.policy.utils.ExtendedConstants;
+import org.cloudbus.cloudsim.policy.utils.ExtendedDatacenter;
+import org.cloudbus.cloudsim.policy.utils.ExtendedDatacenterBrocker;
+import org.cloudbus.cloudsim.policy.utils.ExtendedHelper;
+import org.cloudbus.cloudsim.policy.utils.HelpUtils;
+import org.cloudbus.cloudsim.examples.power.Constants;
+import org.cloudbus.cloudsim.examples.power.Helper;
+import org.cloudbus.cloudsim.examples.power.random.RandomHelper;
+import org.cloudbus.cloudsim.power.PowerHost;
+
+/**
+ * An example showing how to create
+ * scalable simulations.
+ */
+public class VmsToHosts {
+
+	/** The cloudlet list. */
+	private static List<Cloudlet> cloudletList;
+
+	/** The vmlist. */
+	private static List<Vm> vmlist;
+	
+	public static VmAllocationPolicy  instance;
+	
+	/**
+	 * Creates main() to run this example
+	 */
+	public static void main(String[] args) {
+		Log.printLine("Starting VmsToHosts...");
+
+		try {
+			// 第一步: Initialize the CloudSim package. It should be called
+			// before creating any entities.
+			int num_user = 1;   // number of grid users
+			Calendar calendar = Calendar.getInstance();
+			boolean trace_flag = true;  // mean trace events
+			
+			//将输出信息保存在日志文件中
+			boolean enableOutput = true;
+			boolean outputToFile = true;  //控制输出到文件，默认设置为false
+			
+			String []policyArray={"","pso","random","firstfit","bestfit","roundrobin",  "combmff","comblff","ant"};//使用算法名称作为文件名 
+			String policyName=policyArray[1];
+			//根据字符串名获取枚举名称
+			VmAllocationPolicyEnum vmAllocPolicy = VmAllocationPolicyEnum.valueOf(policyName);
+			//根据枚举名称获得接口实例
+			VmAllocationPolicyFactory vmAllocationFac = getPolicyByName(vmAllocPolicy);
+			
+			String experimentName=policyName.toString();
+			String outputFolder="C:\\cloudsim\\VmsToHosts\\";
+			ExtendedHelper.initLogOutput_modify(enableOutput, outputToFile, outputFolder, experimentName);
+
+			// Initialize the CloudSim library
+			CloudSim.init(num_user, calendar, trace_flag);
+
+			// 第二步: 创建数据中心
+			//Datacenters are the resource providers in CloudSim. We need at list one of them to run a CloudSim simulation
+
+	        int numberOfHosts=ExtendedConstants.numberOfHosts;
+	        List<PowerHost>hostList = ExtendedHelper.createHostList(numberOfHosts); //创建物理机
+	        
+	        //通过工厂进行调用，传入接口实例
+	        ExtendedDatacenter datacenter = (ExtendedDatacenter) ExtendedHelper.createDatacenterByVmAllocationPolicyFactory(
+                    "Datacenter",
+                    ExtendedDatacenter.class,
+                    hostList,
+                    vmAllocationFac);
+	        datacenter.setDisableMigrations(true); //设置不迁移
+	        
+	        // 第三步: 创建数据中心代理
+			ExtendedDatacenterBrocker broker = createExtendedBrocker(ExtendedDatacenterBrocker.VM_ALLOCATION_MODE_LIST);
+			int brokerId = broker.getId();
+
+			//第四步: Create VMs and Cloudlets and send them to broker
+	        int numberOfVms=ExtendedConstants.numberOfVms;
+			vmlist = ExtendedHelper.createVmList(brokerId,numberOfVms); //creating 20 vms
+			
+			cloudletList = RandomHelper.createCloudletList(brokerId,numberOfVms); // creating 40 cloudlets
+			broker.submitVmList(vmlist);
+			broker.submitCloudletList(cloudletList);
+
+//	        CloudSim.terminateSimulation(Constants.SIMULATION_LIMIT); //结束时间
+	        
+			// Fifth step: Starts the simulation
+			double lastClock=CloudSim.startSimulation();
+
+			// Final step: Print results when simulation is over
+			List<Cloudlet> newList = broker.getCloudletReceivedList();
+			
+			TreeMap<Integer, Vector<Integer>>deployMap=ExtendedDatacenter.getMydeployMap();
+
+			CloudSim.stopSimulation();
+
+			printCloudletList(newList);
+			
+			//datacenter.printDebts();
+			
+			HelpUtils.visitTreeMap(deployMap,policyName);
+			double ublanceDegree=ExtendedDatacenter.getLoadDegree();
+			int nums=3;
+			System.out.println("The ublanceDegree of the Datacenter is "+HelpUtils.roundDoubleValue(ublanceDegree, nums));
+			
+			//输出一些信息
+			Helper.printResults(
+					datacenter,
+					vmlist,
+					lastClock,
+					experimentName,
+					Constants.OUTPUT_CSV, //在不输出到CSV文件时，后面2项都是多余的
+					outputFolder);
+
+			Log.printLine("VmsToHosts finished!");
+
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+			Log.printLine("The simulation has been terminated due to an unexpected error");
+		}
+	}
+    
+    /**
+     * 通过枚举获得，工厂实例
+     * @param vmAllocPolicy
+     * @return
+     */
+    public static VmAllocationPolicyFactory  getPolicyByName(VmAllocationPolicyEnum vmAllocPolicy){
+		VmAllocationPolicyFactory vmAllocationFac = null;
+		switch(vmAllocPolicy) {
+		case random:
+			vmAllocationFac = new VmAllocationPolicyFactory() {
+				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyRandom(hostList); }
+			};
+			break;
+		case firstfit:
+			vmAllocationFac = new VmAllocationPolicyFactory() {
+				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyFirstFit(hostList); }
+			};
+			break;
+		case bestfit:
+			vmAllocationFac = new VmAllocationPolicyFactory() {
+				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyBestFit(hostList); }
+			};
+			break;
+		case roundrobin:
+			vmAllocationFac = new VmAllocationPolicyFactory() {
+				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyRoundRobin(hostList); }
+			};
+			break;
+		case ant:
+			vmAllocationFac = new VmAllocationPolicyFactory() {
+				//public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyAnt(hostList); }
+				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyACO(hostList); }
+
+			};
+			break;
+		case pso:
+			vmAllocationFac = new VmAllocationPolicyFactory() {
+				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyPSO(hostList); }
+			};
+			break;	
+		case combmff:
+			vmAllocationFac = new VmAllocationPolicyFactory() {
+				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyCombinedMostFullFirst(hostList); }
+			};
+			break;
+		case comblff:
+			vmAllocationFac = new VmAllocationPolicyFactory() {
+				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyCombinedLeastFullFirst(hostList); }
+			};
+			break;
+		default:
+			System.err.println("Choose proper VM placement polilcy!");
+			System.exit(1);
+		
+	}
+		return vmAllocationFac;
+  }
+
+	//We strongly encourage users to develop their own broker policies, to submit vms and cloudlets according
+	//to the specific rules of the simulated scenario
+    public static ExtendedDatacenterBrocker createExtendedBrocker(int vmAllocationMode) {
+        ExtendedDatacenterBrocker broker = null;
+        try {
+            broker = new ExtendedDatacenterBrocker("Broker",vmAllocationMode);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(0);
+        }
+        return broker;
+    }
+
+	/**
+	 * Prints the Cloudlet objects
+	 * @param list  list of Cloudlets
+	 */
+	private static void printCloudletList(List<Cloudlet> list) {
+		int size = list.size();
+		Cloudlet cloudlet;
+
+		String indent = "    ";
+		Log.printLine();
+		Log.printLine("========== OUTPUT ==========");
+		Log.printLine("Cloudlet ID" + indent + "STATUS" + indent +
+				"Data center ID" + indent + "VM ID"
+				+indent + indent+ "Time" + indent + "Start Time" + indent + "Finish Time");
+
+		DecimalFormat dft = new DecimalFormat("###.##");
+		for (int i = 0; i < size; i++) {
+			cloudlet = list.get(i);
+			Log.print(indent + cloudlet.getCloudletId() + indent + indent);
+
+			if (cloudlet.getCloudletStatus() == Cloudlet.SUCCESS){
+				Log.print("SUCCESS");
+
+				Log.printLine( 
+						indent + indent + cloudlet.getResourceId() +
+						indent + indent + indent + cloudlet.getVmId()+
+						indent + indent + indent + dft.format(cloudlet.getActualCPUTime()) +
+						indent + indent + indent +dft.format(cloudlet.getExecStartTime())+
+						indent + indent + indent + dft.format(cloudlet.getFinishTime()));
+			}
+		}
+
+	}
+	
+}

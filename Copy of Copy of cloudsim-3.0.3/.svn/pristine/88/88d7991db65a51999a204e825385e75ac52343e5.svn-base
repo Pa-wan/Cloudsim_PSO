@@ -1,0 +1,95 @@
+package org.cloudbus.cloudsim.ui;
+
+import org.eclipse.swt.layout.FormAttachment;
+import org.eclipse.swt.layout.FormData;
+import org.eclipse.swt.graphics.Color;
+import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.TabFolder;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.layout.FormLayout;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.TabItem;
+import org.eclipse.swt.widgets.Menu;
+import org.eclipse.swt.widgets.MenuItem;
+import org.eclipse.swt.widgets.CoolBar;
+import org.eclipse.swt.widgets.TreeItem;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.widgets.Tree;
+
+public class TestView {
+	private Shell sShell = null; // @jve:decl-index=0:visual-constraint="10,10"
+	private Menu menuBar = null;
+	private CoolBar coolBar = null;
+	private SashForm sashForm = null;
+	private TabFolder tabFolder = null;
+	private Tree tree = null;
+
+	/**
+	 * @wbp.parser.entryPoint
+	 */
+	public void createSShell() {
+		sShell = new Shell();
+		sShell.setText("Shell");
+		createCoolBar();
+		createSashForm();
+		sShell.setSize(new Point(604, 408));
+		sShell.setLayout(new FormLayout());
+		menuBar = new Menu(sShell, SWT.BAR);
+		createMenuBar();
+		sShell.setMenuBar(menuBar);
+		sShell.open();
+	}
+
+	private void createMenuBar() {
+		MenuItem push = new MenuItem(menuBar, SWT.PUSH);
+		push.setText("文件");
+		MenuItem push1 = new MenuItem(menuBar, SWT.PUSH);
+		push1.setText("编辑");
+		MenuItem push2 = new MenuItem(menuBar, SWT.PUSH);
+		push2.setText("窗口");
+		MenuItem push3 = new MenuItem(menuBar, SWT.PUSH);
+		push3.setText("帮助");
+	}
+
+	private void createCoolBar() {
+		coolBar = new CoolBar(sShell, SWT.NONE);
+		FormData formData = new FormData();
+		formData.left = new FormAttachment(00, 0);
+		formData.right = new FormAttachment(100, -0);
+		formData.top = new FormAttachment(100, -24);
+		formData.bottom = new FormAttachment(100, 0);
+		coolBar.setLayoutData(formData);
+		Color color = new Color(Display.getCurrent(), 0, 0, 0);
+		coolBar.setBackground(color);
+	}
+
+	private void createSashForm() {
+		sashForm = new SashForm(sShell, SWT.NONE);
+		FormData formData = new FormData();
+		formData.left = new FormAttachment(0, 3);
+		formData.right = new FormAttachment(100, -3);
+		formData.top = new FormAttachment(0, 0);
+		formData.bottom = new FormAttachment(100, -25);
+		sashForm.setLayoutData(formData);
+		tree = new Tree(sashForm, SWT.NONE);
+		createTree();
+		createTabFolder();
+		sashForm.setWeights(new int[] { 1, 3 });
+	}
+
+	private void createTree() {
+		TreeItem treeItem = new TreeItem(tree, SWT.NONE);
+		treeItem.setText("根结点");
+	}
+
+	private void createTabFolder() {
+		tabFolder = new TabFolder(sashForm, SWT.NONE);
+		TabItem tabItem = new TabItem(tabFolder, SWT.NONE);
+		tabItem.setText("属性标签");
+		Label label = new Label(tabFolder, SWT.NONE);
+		tabItem.setControl(label);
+		label.setText("文字标签");
+	}
+}

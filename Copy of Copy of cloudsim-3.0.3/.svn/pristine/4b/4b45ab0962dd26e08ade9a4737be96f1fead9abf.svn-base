@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="examples"/>
+	<classpathentry kind="src" path="sources"/>
+	<classpathentry kind="lib" path="jars/cloudsim-3.0.3-sources.jar"/>
+	<classpathentry kind="lib" path="jars/cloudsim-3.0.3.jar"/>
+	<classpathentry kind="lib" path="jars/cloudsim-examples-3.0.3-sources.jar"/>
+	<classpathentry kind="lib" path="jars/cloudsim-examples-3.0.3.jar"/>
+	<classpathentry kind="lib" path="jars/OpenForecast-0.5.0-src.jar"/>
+	<classpathentry kind="lib" path="jars/OpenForecast-0.5.0.jar" sourcepath="E:/MyEclipse 10/cloudsim-3.0.3/jars/OpenForecast-0.5.0-src.jar"/>
+	<classpathentry kind="lib" path="jars/commons-math3-3.0.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

@@ -1,0 +1,34 @@
+package org.cloudbus.cloudsim.hust.acopso;
+
+import java.util.concurrent.RecursiveAction;
+
+
+public class ParallelAnt extends RecursiveAction {
+	private static final long serialVersionUID = 1L;
+	public static final int thre=10;//阈值
+	private int start;
+	private int end;
+	private ACO aco;
+	
+	public ParallelAnt(int start, int end, ACO aco) {
+		this.start = start;
+		this.end = end;
+		this.aco = aco;
+	}
+
+	@Override
+	protected void compute() {
+		if ((end - start) <= thre) {
+			for (int i = start; i <end; i++) {
+				aco.ants[i].run();
+			}
+		}else{
+			int middle = (start + end) / 2;
+			ParallelAnt aco1=new ParallelAnt(start, middle,aco);
+			ParallelAnt aco2=new ParallelAnt(middle,end,aco);
+			aco1.fork();
+			aco2.fork();
+		}
+	}
+
+}

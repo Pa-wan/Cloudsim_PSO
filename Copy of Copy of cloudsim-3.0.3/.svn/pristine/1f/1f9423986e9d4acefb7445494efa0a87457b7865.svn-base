@@ -1,0 +1,228 @@
+package org.cloudbus.cloudsim.ui;
+
+import java.awt.Dimension;
+import java.awt.Toolkit;
+import java.util.concurrent.CountDownLatch;
+
+import org.cloudbus.cloudsim.policy.DynamicProcess;
+import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
+import org.cloudbus.cloudsim.policy.utils.ExtHelper;
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Group;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.MessageBox;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.TabFolder;
+import org.eclipse.swt.widgets.TabItem;
+import org.eclipse.swt.widgets.Text;
+import org.eclipse.wb.swt.SWTResourceManager;
+
+public class MainFrame {
+	public static Display display;
+	public static Shell shell;
+	private Text text;
+	private Text text_1;
+	private Text text_2;
+	private Text text_3;
+	private Text vmNum;
+	private Text hostNum;
+	
+	public static void main(String[] args) {
+		display=new Display();
+		MainFrame window = new MainFrame();
+		window.open();
+		
+	}
+
+	private void open() {
+		shell = new Shell(display);
+		shell.setSize(1000, 698);
+		Dimension dm = Toolkit.getDefaultToolkit().getScreenSize();
+		shell.setBounds((int)(dm.getWidth()-1000)/2,(int)(dm.getHeight()-700)/2, 1000, 700);
+		shell.setLayout(null);
+		
+		Label label = new Label(shell, SWT.NONE);
+		label.setBounds(306, 21, 352, 40);
+		label.setAlignment(SWT.CENTER);
+		label.setFont(SWTResourceManager.getFont("微软雅黑", 14, SWT.NORMAL));
+		label.setText("数据中心资源调度仿真平台");
+		
+		SashForm sashForm = new SashForm(shell, SWT.NONE);
+		sashForm.setSashWidth(0);
+		sashForm.setBounds(95, 83, 812, 407);
+		
+		Composite composite = new Composite(sashForm, SWT.BORDER);
+		
+		Group group_2 = new Group(composite, SWT.NONE);
+		group_2.setBackground(SWTResourceManager.getColor(SWT.COLOR_WHITE));
+		group_2.setText("初始化配置");
+		group_2.setBounds(10, 53, 231, 293);
+		
+		Label label_3 = new Label(group_2, SWT.NONE);
+		label_3.setBackground(SWTResourceManager.getColor(SWT.COLOR_WHITE));
+		label_3.setBounds(10, 56, 48, 17);
+		label_3.setText("虚拟机：");
+		
+		vmNum = new Text(group_2, SWT.BORDER);
+		vmNum.setText("300");
+		vmNum.setBounds(64, 53, 73, 23);
+		
+		Label lblNewLabel_2 = new Label(group_2, SWT.NONE);
+		lblNewLabel_2.setBackground(SWTResourceManager.getColor(SWT.COLOR_WHITE));
+		lblNewLabel_2.setBounds(10, 96, 48, 17);
+		lblNewLabel_2.setText("物理机：");
+		
+		hostNum = new Text(group_2, SWT.BORDER);
+		hostNum.setText("100");
+		hostNum.setBounds(64, 96, 73, 23);
+		
+		final Button initSubmit = new Button(group_2, SWT.NONE);
+		initSubmit.setBounds(10, 137, 80, 27);
+		initSubmit.setText("确定");
+		
+		Button initReset = new Button(group_2, SWT.NONE);
+		initReset.setBounds(113, 137, 80, 27);
+		initReset.setText("重置");
+		
+		Composite composite_1 = new Composite(sashForm, SWT.BORDER);
+		
+		final TabFolder tabFolder = new TabFolder(composite_1, SWT.NONE);
+		tabFolder.setLocation(76, 58);
+		tabFolder.setSize(438, 291);
+		//tabFolder.setEnabled(false);
+		
+		final CountDownLatch count=new CountDownLatch(1);
+		initSubmit.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				initSubmit.setEnabled(false);
+				Runnable runnable = new Runnable() {
+					 @Override
+					public void run() {
+						 Main.init();
+						 count.countDown();
+						}    		 
+					 }; 
+				new Thread(runnable).start();
+				Runnable runnable1 = new Runnable() {
+					 @Override
+					public void run() {
+						 while(count.getCount()!=0);
+						 Display.getDefault().asyncExec(new Runnable(){
+								@Override
+								public void run() {
+									MessageBox messageBox=new MessageBox(shell);
+									messageBox.setText("提示框");
+									messageBox.setMessage("初始化完成！");
+									messageBox.open();
+									tabFolder.setEnabled(true);
+									
+								}
+							  });
+						 DynamicProcess dynamicProcess=new DynamicProcess(ExtHelper.vmAllocationPolicy);
+						 dynamicProcess.dynamicRun();
+						}    		 
+					 }; 
+				new Thread(runnable1).start();
+			}
+		});
+		
+		TabItem tabItem = new TabItem(tabFolder, SWT.NONE);
+		tabItem.setText("用户");
+		
+		Group group = new Group(tabFolder, SWT.NONE);
+		tabItem.setControl(group);
+		group.setFont(SWTResourceManager.getFont("微软雅黑", 10, SWT.NORMAL));
+		group.setText("登录_注册");
+		
+		Label lblNewLabel = new Label(group, SWT.NONE);
+		lblNewLabel.setBounds(36, 51, 61, 17);
+		lblNewLabel.setText("用户名");
+		
+		Label lblNewLabel_1 = new Label(group, SWT.NONE);
+		lblNewLabel_1.setBounds(36, 99, 61, 17);
+		lblNewLabel_1.setText("密   码");
+		
+		text = new Text(group, SWT.BORDER);
+		text.setBounds(128, 51, 73, 23);
+		
+		text_1 = new Text(group, SWT.BORDER);
+		text_1.setBounds(128, 99, 73, 23);
+		
+		Button btnNewButton = new Button(group, SWT.NONE);
+		btnNewButton.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				//用户登录响应代码
+				UserFrame u=new UserFrame(shell, SWT.DIALOG_TRIM | SWT.MIN| SWT.MAX | SWT.APPLICATION_MODAL);
+				u.open();
+				if(u.shell.isDisposed())
+					shell.setVisible(true);
+			}
+		});
+		btnNewButton.setBounds(59, 135, 80, 27);
+		btnNewButton.setText("登录");
+		
+		Button btnNewButton_1 = new Button(group, SWT.NONE);
+		btnNewButton_1.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				//用户注册响应代码
+			}
+		});
+		btnNewButton_1.setBounds(189, 135, 80, 27);
+		btnNewButton_1.setText("注册");
+		
+		TabItem tabItem_1 = new TabItem(tabFolder, SWT.NONE);
+		tabItem_1.setText("管理员");
+		
+		Group group_1 = new Group(tabFolder, SWT.NONE);
+		group_1.setText("登录");
+		tabItem_1.setControl(group_1);
+		
+		Label label_1 = new Label(group_1, SWT.NONE);
+		label_1.setBounds(36, 51, 61, 17);
+		label_1.setText("管理员名");
+		
+		Label label_2 = new Label(group_1, SWT.NONE);
+		label_2.setBounds(36, 99, 61, 17);
+		label_2.setText("密      码");
+		
+		text_2 = new Text(group_1, SWT.BORDER);
+		text_2.setBounds(128, 51, 73, 23);
+		
+		text_3 = new Text(group_1, SWT.BORDER);
+		text_3.setBounds(128, 99, 73, 23);
+		
+		Button btnNewButton_2 = new Button(group_1, SWT.NONE);
+		btnNewButton_2.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				//管理员登录响应代码
+				AdminFrame a=new AdminFrame(shell, SWT.DIALOG_TRIM | SWT.MIN| SWT.MAX | SWT.APPLICATION_MODAL);
+				a.open();
+				if(a.shell.isDisposed())
+					shell.setVisible(true);
+			}
+		});
+		btnNewButton_2.setBounds(59, 135, 80, 27);
+		btnNewButton_2.setText("登录");
+		sashForm.setWeights(new int[] {263, 541});
+		
+		shell.open();
+		while (!shell.isDisposed()) {		/*如果当前窗口未被销毁*/
+		   if (!display.readAndDispatch()) {
+			   display.sleep();			//在窗口没有销毁之前,显示对象处于休眠状态 
+		    }
+		}
+		display.dispose();//销毁当前对象 
+		//加入下面语句是解决程序退出后javaw.exe进程仍然运行问题
+		System.exit(0);// 退出程序 
+	}
+}

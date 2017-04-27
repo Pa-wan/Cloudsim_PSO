@@ -1,0 +1,159 @@
+package org.cloudbus.cloudsim.hust.migrate;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.provisioners.UtilProvisioner;
+
+public class HotSpotDetection {
+	private UtilProvisioner utilProvisioner;
+	private List<Host> highLoaded;
+	private List<Host> lowLoaded;
+	private List<Host> hotSpots;
+	private static final double cpuThreshold=0.5;
+	private static final double ramThreshold=0.5;
+	private static final double bwThreshold=0.5;
+	private static final double storageThreshold=0.5;
+	private static final double alpha=0.4;
+	private static final int k=3;
+	
+	public HotSpotDetection(UtilProvisioner utilProvisioner){
+		this.utilProvisioner=utilProvisioner;
+		highLoaded=new ArrayList<Host>();
+		lowLoaded=new ArrayList<Host>();
+		hotSpots=new ArrayList<Host>();
+	}
+	
+	/**
+	 * 将物理机集合分类
+	 */
+	public void classify(){
+		highLoaded.clear();
+		lowLoaded.clear();
+		hotSpots.clear();
+		List<Host> hostList=utilProvisioner.getPolicy().getHostList();
+		for(Host host:hostList){
+			if(isHighLoaded(host)){
+				highLoaded.add(host);
+				if(isHotSpot(host))
+					hotSpots.add(host);
+			}else{
+				lowLoaded.add(host);
+			}
+		}
+	}
+	
+	private boolean isHighLoaded(Host host){
+		double[] util=utilProvisioner.getUtil().get(host.getId());
+		return isHighLoaded(util);
+	}
+	/**
+	 * 判断过载情况
+	 * @param util
+	 * @return
+	 */
+	public static boolean isHighLoaded(double[] util){
+		if(util[0]>=cpuThreshold||util[1]>=ramThreshold||
+				util[2]>=bwThreshold||util[3]>=storageThreshold)
+			return true;
+		else
+			return false;
+	}
+	
+	/**
+	 * 判断物理机是否为热点物理机
+	 * @param host
+	 * @return
+	 */
+	private boolean isHotSpot(Host host){
+		LinkedList<double[]> utilTs=utilProvisioner.getUtilTs().get(host);
+		if(utilTs.size()<UtilProvisioner.capacity||!isHighLoaded(utilTs.getLast()))
+			return false;
+		else{
+			int count=0;
+			Iterator<double[]> iterator=utilTs.iterator();
+			while(iterator.hasNext()){
+				double[] temp=iterator.next();
+				if(isHighLoaded(temp)){
+					count++;
+				}
+			}
+			if(count>=k&&predictionisOverLoaded(utilTs))
+				return true;
+			else
+				return false;
+		}
+	}
+	
+	/**
+	 * 一次指数平滑预测四维利用率
+	 * @param list
+	 * @return 预测值是否过载
+	 */
+	private boolean predictionisOverLoaded(LinkedList<double[]> list){
+		double cpuUtil=0,ramUtil=0,bwUtil=0,storageUtil=0;
+		int limit=0;
+		Iterator<double[]> iterator=list.iterator();
+		while(iterator.hasNext()){
+			double[] temp=iterator.next();
+			cpuUtil=cpuUtil+temp[0]/3;
+			ramUtil=ramUtil+temp[1]/3;
+			bwUtil=bwUtil+temp[2]/3;
+			storageUtil=storageUtil+temp[3]/3;
+			if(limit++==3)
+				break;
+		}
+		double preCpuUtil=cpuUtil,preRamUtil=ramUtil,preBwUtil=bwUtil,preStorageUtil=storageUtil;
+		iterator=list.iterator();
+		while(iterator.hasNext()){
+			double[] temp=iterator.next();
+			preCpuUtil=alpha*temp[0]+(1-alpha)*preCpuUtil;
+			preRamUtil=alpha*temp[1]+(1-alpha)*preRamUtil;
+			preBwUtil=alpha*temp[2]+(1-alpha)*preBwUtil;
+			preStorageUtil=alpha*temp[3]+(1-alpha)*preStorageUtil;
+		}
+		double[] preUtil={preCpuUtil,preRamUtil,preBwUtil,preStorageUtil};
+		if(isHighLoaded(preUtil))
+			return true;
+		else
+			return false;
+	}
+
+	public UtilProvisioner getUtilProvisioner() {
+		return utilProvisioner;
+	}
+
+	public void setUtilProvisioner(UtilProvisioner utilProvisioner) {
+		this.utilProvisioner = utilProvisioner;
+	}
+
+	public List<Host> getHighLoaded() {
+		return highLoaded;
+	}
+
+	public void setHighLoaded(List<Host> highLoaded) {
+		this.highLoaded = highLoaded;
+	}
+
+	public List<Host> getLowLoaded() {
+		return lowLoaded;
+	}
+
+	public void setLowLoaded(List<Host> lowLoaded) {
+		this.lowLoaded = lowLoaded;
+	}
+
+	public List<Host> getHotSpots() {
+		return hotSpots;
+	}
+
+	public void setHotSpots(List<Host> hotSpots) {
+		this.hotSpots = hotSpots;
+	}
+	
+	
+	
+}

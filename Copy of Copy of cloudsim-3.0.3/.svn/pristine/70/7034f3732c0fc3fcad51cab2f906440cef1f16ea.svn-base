@@ -1,0 +1,305 @@
+package org.cloudbus.cloudsim.hust.pso;
+
+import java.math.BigDecimal;
+import java.util.Random;
+import java.util.Vector;
+
+/**
+ * Particle update strategy
+ * 
+ * Every Swarm.evolve() itereation the following methods are called
+ * 		- begin(Swarm) : Once at the begining of each iteration
+ * 		- update(Swarm,Particle) : Once for each particle
+ * 		- end(Swarm) : Once at the end of each iteration
+ * 
+ */
+public class ParticleUpdateImpl extends ParticleUpdate {
+	Random random=new Random();
+
+	/** Random vector for local update */
+	double rlocal[];
+	/** Random vector for global update */
+	double rglobal[];
+	/** Random vector for neighborhood update */
+
+	/**
+	 * Constructor 
+	 * @param particle : Sample of particles that will be updated later
+	 */
+	public ParticleUpdateImpl(Particle particle) {
+		super(particle);
+		rlocal = new double[particle.getDimension()];
+		rglobal = new double[particle.getDimension()];
+	}
+
+	/** 
+	 * This method is called at the begining of each iteration
+	 * Initialize random vectors use for local and global updates (rlocal[] and rother[])
+	 */
+	@Override
+	public void begin(Swarm swarm) {
+		int i, dim = swarm.getSampleParticle().getDimension();
+		for (i = 0; i < dim; i++) {
+			rlocal[i] = Math.random();
+			rglobal[i] = Math.random();
+		}
+	}
+
+	/** This method is called at the end of each iteration */
+	@Override
+	public void end(Swarm swarm) {
+	}
+
+	/** Update particle's velocity and position */
+	/**基于模拟退火思想实现对最优位置的替换，以一定的概率选择劣质解
+	 * 这是最关键的一步
+	 * @param swarm   粒子群
+	 * @param particle   粒子群中当前粒子
+	 * @param currentTemp  当前降温温度
+	 */
+	@Override
+	public void update(Swarm swarm, Particle particle,double currentTemp) {
+		
+		int position[] = particle.getPosition();//粒子当前位置
+		int particleBestPosition[] = particle.getBestPosition(); //粒子得到的最好位置
+		
+		//【1】改进算法中，全局最优解通过SA算法实现，利用轮盘赌思想，获取全局最优解的替代值，实际上使用某一个可行解的位置来取代
+		//通过调用函数的形式进行传参，
+//		int globalBestPosition[] = swarm.getBestPosition(); //粒子群的最好位置
+		
+		//使用模拟退火算法求解粒子的最优位置
+		int globalBestPosition[] = substitute_GlobalPosition(swarm,currentTemp);
+		
+		//【2】或者是惯性权重的获得，通过SA实现，动态自适应的过程
+		
+		/**
+		 * --------------------update velocity------------
+		 */
+		int [] velocity = particle.getVelocity();
+		
+		//问题出现在这里，fit value值没有进行相应更新
+		double currFitValue=particle.getFitness();
+		double localBestFitValue=particle.getlocalFitness();
+		double globalBestFitValue=swarm.getBestFitness();
+		
+		/**********************计算概率********************************/
+		double [] probilityArray=new double[3];
+		double sumProbility=currFitValue+localBestFitValue+globalBestFitValue+3;
+		probilityArray[0]=(currFitValue+1)/sumProbility;
+		probilityArray[1]=(1+localBestFitValue)/sumProbility;
+		probilityArray[2]=1.0-(probilityArray[0]+probilityArray[1]);
+		
+		/**********************数乘运算********************************/
+		double []first=digitMutiplyArray(probilityArray[0],velocity);
+		double []second=digitMutiplyArray(probilityArray[1],sub(particleBestPosition,position));
+		double []third=digitMutiplyArray(probilityArray[2],sub(globalBestPosition,position));
+		
+		int size=position.length;
+		/**********************加法概率********************************/
+		//计算新的速度值，并将新的速度值进行拷贝复制
+		int [] newVelocity=add(first,second,third,size,swarm,particle);
+		copyFrom2To(newVelocity,velocity,size);
+		
+		/**
+		 * --------------------update position------------
+		 * 速度更新，根据速度值和当前的位置值
+		 */
+		int [] newPosition=adjustPosition(position,velocity);
+		particle.applyConstraints_origin(newPosition);
+	}
+	
+	/** Update particle's velocity and position */
+	/**粒子的速度位置更新函数的重新实现
+	 * @param swarm   粒子群
+	 * @param particle   粒子群中当前粒子
+	 * @param currentTemp  当前降温温度
+	 * 这部分的代码需要进行必要的调整
+	 */
+	public void update_modify(Swarm swarm, Particle particle,double currentTemp) {
+		int position[] = particle.getPosition();
+		int velocity[] = particle.getVelocity();
+		int globalBestPosition[] = swarm.getBestPosition();
+		
+		/**********************利用模拟退火以一定概率选择劣质解********************************/
+//		int globalBestPosition[] = substitute_GlobalPosition(swarm,currentTemp);
+		
+		int particleBestPosition[] = particle.getBestPosition();
+
+		// Update velocity and position
+		/**********************逐位求解********************************/
+		for (int i = 0; i < position.length; i++) {
+			// Update velocity
+			velocity[i] = (int) (swarm.getInertia() * velocity[i] // Inertia
+					+ rlocal[i] * swarm.getParticleIncrement() * (particleBestPosition[i] - position[i]) // Local best
+					+ rglobal[i] * swarm.getGlobalIncrement() * (globalBestPosition[i] - position[i])); // Global best
+			// Update position
+			position[i] += velocity[i];
+			/**注意需要对位置【这里指: vm_map_pm_Array这个数组】进行必要的处理
+			 * 处理原则:
+			 *     【1】位置必须保证为整数
+			 *     【2】粒子的位置必须为一个可行解
+			 *          若不为可行解，该如何进行处理
+			 */
+		}
+	}
+	
+	//定义 ⊕ 【加法】算子   Addition Operator
+	//注意，不确定的bit位。使用当前适应度值，局部最优适应度值和全局最优适应度值进行确定
+	//注意加法运算中double类型的数组是通过概率因子与速度公式计算得到的
+	public int [] add(double[]arrayA,double[]arrayB,double []arrayC,int size,Swarm swarm, Particle particle){
+		int index=0;
+		double sum;
+		int [] array=new int[size];
+		for(;index<size;index++){
+			sum=arrayA[index]+arrayB[index]+arrayC[index];
+			int num0=0,num1=1;
+			if(IntequalsDouble(num0,sum)||IntequalsDouble(num1,sum)){
+				if(IntequalsDouble(num0,sum))
+					array[index]=num0;
+				else
+					array[index]=num1;
+			}
+			else{
+				//通过计算粒子的当前适应度值，局部最优适应度值，全局适应度值
+				double currFitValue=particle.getFitness();
+				double localBestFitValue=particle.getlocalFitness();
+				double globalBestFitValue=swarm.getBestFitness();
+				double [] probilityArray=new double[3];
+				double sumProbility=currFitValue+localBestFitValue+globalBestFitValue;
+				probilityArray[0]=currFitValue/sumProbility;
+				probilityArray[1]=(currFitValue+localBestFitValue)/sumProbility;
+				probilityArray[2]=1.0;
+				//借鉴轮盘赌思想，根据对应bit位上值进行确定，该不确定位到底是何值
+				double randNum=random.nextDouble();
+				if(randNum<=probilityArray[0])
+					array[index]=particle.getVelocity()[index];
+				else if(randNum<=probilityArray[1])
+					array[index]=particle.getBestVelocity()[index];
+				else
+					array[index]=swarm.getGlobalBestVelocity()[index];
+			}
+		}
+		return array;
+	}
+	
+	//根据速度位来更新位置上的bit位
+	public int [] adjustPosition(int []position,int[]velocity){
+		int index,size=position.length,cnt=0;
+		Vector<Integer>temp=new Vector<Integer>();
+		for(index=0;index<size;index++){
+			if(velocity[index]==0){
+				temp.add(index);
+				cnt++;
+			}
+		}
+		int []result=new int[cnt];
+		index=0;
+		for(int lee:temp)
+			result[index++]=lee;
+		return result;
+	}
+	
+	//定义 Θ 【减法】算子   Subtraction operator
+	public int [] sub(int []arrayA,int []arrayB){
+		int index,size;
+		size=arrayA.length;
+		int []diff=new int[size];
+		for(index=0;index<size;index++){
+			diff[index]=arrayA[index]&arrayB[index];
+		}
+		return diff;
+	}
+	
+	//定义  X 【乘法】算子
+	
+	//定义数字与数组的乘法
+	public static double[] digitMutiplyArray(double digit,int[]array){
+		int index,size;
+		size=array.length;
+		double []result=new double[size];
+		for(index=0;index<size;index++)
+			result[index]=digit*array[index];
+		return result;
+	}
+	
+	//比较1.00与1,0.00与0是否相等
+	public boolean IntequalsDouble(int numInt,double numDouble){
+		// 控制运算精度使用 BigDecimal
+		boolean flag=false;
+		BigDecimal first=new BigDecimal(numInt);
+		//bug:double值可能不存在
+		BigDecimal second=new BigDecimal(numDouble);
+		if(first.compareTo(second)==0)
+			flag=true;
+		return flag;
+	}
+	
+	public void copyFrom2To(int []from,int []to,int size){
+		int index;
+		for(index=0;index<size;index++){
+			to[index]=from[index];
+		}
+	}
+	
+	/**  创新点，使用模拟退火思想，以一定的概率选择劣质解
+	 * 【1】求出在当前种群，当前温度下，粒子群的最优位置的一个替代位置
+	 * 根据轮盘赌，以一定的概率选择劣质解
+	 * @param swarm 粒子群
+	 * @param currentTemperature 当前温度
+	 * @return  全局最优位置的一个替代值
+	 */
+	public int [] substitute_GlobalPosition(Swarm swarm,double currentTemp){
+		//获取位置数组的长度
+		int size=swarm.physicalMachine.length;
+		int []result=new int [size];
+		
+		//计算当前温度下，各个位置的适应度值
+		int swarmsize=swarm.numberOfParticles; //粒子群规模
+		double []fitness_on_currTemp=new double[swarmsize];//存放当前温度下的适应度值
+		double global_best_fitness=swarm.bestFitness; //种群中的全局最优值
+		double sum=0.0;
+		for (int particleIndex = 0; particleIndex < swarmsize; particleIndex++) {
+			//获取当前粒子的适应度值
+			double curr_particle_fitness=swarm.getParticles()[particleIndex].getFitness();
+			//计算当前温度下，粒子对应的适应度值
+			fitness_on_currTemp[particleIndex]=Math.pow(Math.E, -(curr_particle_fitness-global_best_fitness)/currentTemp);
+			//将适应度值进行累加求和
+			sum+=fitness_on_currTemp[particleIndex];
+		}
+		
+		//获取适应度值对应的概率值，方便轮盘求解
+		double [] roulette_probability=new double[swarmsize];
+		for (int particleIndex = 0; particleIndex < swarmsize; particleIndex++) {
+			double curr_particle_fitness=swarm.getParticles()[particleIndex].getFitness();
+			roulette_probability[particleIndex]=curr_particle_fitness/sum;
+		}
+		
+		//轮盘法
+		int selectIndex=getRouletteIndex(roulette_probability,swarmsize);
+		
+		//使用轮盘法得到的粒子的最优位置来替换粒子群的最优位置
+		result=swarm.getParticles()[selectIndex].bestPosition;
+		
+		return result;
+	}
+	
+	public int getRouletteIndex(double[] p, int size) {
+		Random random = new Random(System.currentTimeMillis());
+		double sleectP = random.nextDouble();// 取一个随机数
+		int selectIndex = 0;
+		float sum1 = 0.f;
+		for (int i = 0; i < size; i++) {
+			sum1 += p[i]; // 概率进行累加，这个操作相当于转动轮盘
+			if (sum1 >= sleectP) { // 轮盘停止转动，记下城市编号，直接跳出循环
+				selectIndex = i;
+				break;
+			}
+		}
+		return selectIndex;
+	}
+	
+	public static void printArray(double[] probilityArray){
+		for(double lee:probilityArray)
+			System.out.print(lee+" ");
+	}
+}

@@ -1,0 +1,67 @@
+package org.cloudbus.cloudsim.hust.contrast_test;
+
+
+import org.cloudbus.cloudsim.hust.pso.FitnessFunction;
+import org.cloudbus.cloudsim.hust.pso.Particle;
+import org.cloudbus.cloudsim.hust.pso.Swarm;
+import org.cloudbus.cloudsim.hust.utils.Utils;
+import org.cloudbus.cloudsim.hust.base.PhysicalMachine;
+import org.cloudbus.cloudsim.hust.base.VirtualMachine;
+
+public class PSOFit {
+	int dimension;
+	int numberOfIterations = 100; // 迭代次数
+	Swarm swarm;
+	
+	public PSOFit(PhysicalMachine [] pmArray,VirtualMachine  [] vmArray){
+		dimension=pmArray.length;
+		this.swarm = new Swarm(pmArray,vmArray,numberOfIterations,Swarm.DEFAULT_NUMBER_OF_PARTICLES, new Particle(dimension), new FitnessFunction(false));
+	}
+	
+	public void psoFit(){
+		// Optimize
+//		long startTime = System.currentTimeMillis();    //获取开始时间
+		
+		double init_temp,curr_temp,constNum;
+		init_temp=1000;  //初始温度，目前不确定
+		constNum=0.9; //降温系数，<1的值
+		curr_temp=init_temp; //初始化当前温度
+		
+
+		
+		int iter=0;
+		while(iter < numberOfIterations){ //未达到迭代条件
+			//对粒子群和粒子群中每个粒子进行更新操作
+			swarm.evolve(iter,curr_temp);
+			iter++;  //更新迭代次数
+			curr_temp*=constNum; //进行降温
+		}
+		
+//		long endTime = System.currentTimeMillis();    //获取结束时间
+//		
+//		System.out.println("程序运行时间：" + (endTime - startTime) + "ms");    //输出程序运行时间
+		
+//        printResult();
+	}
+	
+	public void printResult(){
+		// Print final results
+		 System.out.println("\n---------------------------------------------------------------------");
+		 System.out.println("------------------【5】Particle Swarm Optimization Algorithm------------");
+		 System.out.println("-----------------------------------------------------------------------");
+//		swarm.printResult();
+		int []array=swarm.getBest_vm_pm_map_Array();
+		Utils.printIntArray(array);
+		
+		System.out.println(swarm.toStringStats());
+	}
+
+	public Swarm getSwarm() {
+		return swarm;
+	}
+
+	public void setSwarm(Swarm swarm) {
+		this.swarm = swarm;
+	}
+
+}

@@ -1,0 +1,250 @@
+package org.cloudbus.cloudsim.hust.acopso;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.hust.aco.Solution;
+
+public class ACO {
+	public Ant[] ants;//蚂蚁
+	private int antNum;//蚂蚁数量
+	private List<Vm> vmList;//虚拟机列表
+	private List<Host> hostList;//物理机列表
+	private int MAX_GEN; // 运行代数
+	private static double[][] pheromone; // 信息素矩阵
+	private double[][] distance; // 距离矩阵
+	private double bestLoad;
+
+	// 三个参数
+	public static double alpha;
+	public static double beta;
+	public static double rho;
+	//private LinkedList<Solution> pareto;
+	private Solution bestSolution;
+	private Map<String,ArrayList<Host>> allowed;//可以满足该虚拟机的物理机候选表
+	private Map<Integer,ArrayList<Vm>> update;//可以满足该物理机的虚拟机列表，目的在于提高资源更新效率
+	private Map<Integer,Host> hostById;
+	private Map<String,Vm> vmByUid;
+	
+	public ACO(int antNum,List<Vm> vms,List<Host> hosts,int gen,double alpha,double beta,double rho){
+		this.antNum=antNum;
+		ants=new Ant[antNum];
+		vmList=vms;
+		hostList=hosts;
+		MAX_GEN=gen;
+		this.alpha=alpha;
+		this.beta=beta;
+		this.rho=rho;
+		bestLoad=Double.MAX_VALUE;
+		init();
+	}
+	
+	private void init(){
+		int vmNum=vmList.size();
+		int hostNum=hostList.size();
+		
+		distance=new double[vmNum][hostNum];
+		allowed=new HashMap<String,ArrayList<Host>>();
+		update=new HashMap<Integer,ArrayList<Vm>>();
+		hostById=new HashMap<Integer, Host>();
+		vmByUid=new HashMap<String, Vm>();
+		pheromone=new double[vmNum][hostNum];
+		//pareto=new LinkedList<Solution>();
+		boolean matchMatrix[][]=new boolean[vmNum][hostNum];
+		
+//		Solution firstAnswer=new Solution(Integer.MIN_VALUE,Double.MAX_VALUE,null);
+//		pareto.add(firstAnswer);
+		
+		for(Vm vm:vmList){//计算每台虚拟机的物理机候选表和资源匹配距离
+			vmByUid.put(vm.getUid(), vm);
+			ArrayList<Host>  temp=new ArrayList<Host>();
+			for(Host host:hostList){
+				pheromone[vm.getId()][host.getId()]=1.0;//初始化信息素矩阵
+				if(Utils.isSuitable(vm,host)){
+					double s=Utils.calcuDistance(vm,host);
+					distance[vm.getId()][host.getId()]=s;
+					matchMatrix[vm.getId()][host.getId()]=true;
+					temp.add(host);
+				}else{
+					distance[vm.getId()][host.getId()]=0;
+					matchMatrix[vm.getId()][host.getId()]=false;
+				}
+			}
+			allowed.put(vm.getUid(), temp);
+		}
+		
+	  for(Host host:hostList){
+		  hostById.put(host.getId(), host);
+		  ArrayList<Vm> temp=new ArrayList<Vm>();
+		  for(Vm vm:vmList){
+			  if(matchMatrix[vm.getId()][host.getId()]){
+				  temp.add(vm);
+			  }
+		  }
+		  update.put(host.getId(), temp);
+	  }
+		
+		// 随机放置蚂蚁
+		for (int i = 0; i < antNum; i++) {
+			ants[i] = new Ant(vmList, hostList,this);
+			ants[i].init(distance, allowed, update);
+		}
+	}
+	/**
+	 *解决问题入口方法
+	 */
+	public void solve() {
+		int g=1;
+		for (g = 1; g <=MAX_GEN; g++) {
+			 ForkJoinPool forkJoinPool = new ForkJoinPool(); 
+			 try {
+			 forkJoinPool.submit(new ParallelAnt(0,antNum,this));
+			 forkJoinPool.shutdown();//两者顺序一定不能放反了
+ 			 forkJoinPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			// antNum只蚂蚁
+			for (int i = 0; i < antNum; i++) {
+				if(ants[i].getVmTohost().size()==vmList.size()){
+					//添加pso算法对每个解进行优化
+					PSO pso=new PSO(ants[i]);
+					pso.solve();
+					ants[i].setBestLoad(pso.getBestSolution().getBestLoad());
+					ants[i].setBanlanceDegree(pso.getBestSolution().getBanlanceDegree());
+					ants[i].setVmTohost(pso.getBestSolution().getVmTohost());
+					double temp=pso.getBestSolution().getBanlanceDegree();
+					for(Vm vm:vmList){
+						ants[i].getDelta()[vm.getId()][ants[i].getVmTohost().get(vm.getUid())]=g*0.05/MAX_GEN;
+					}
+					if(temp<bestLoad){
+						bestLoad=temp;
+						// 更新这只蚂蚁的信息素变化矩阵
+//						for(Vm vm:vmList){
+//							ants[i].getDelta()[vm.getId()][ants[i].getVmTohost().get(vm.getUid())]=g*0.05/MAX_GEN;
+//						}
+						
+						Map<String,Integer> vmTohost=new HashMap<String, Integer>();
+						Iterator<Entry<String,Integer>> it=pso.getBestSolution().getVmTohost().entrySet().iterator();
+						while(it.hasNext()){
+							Entry<String,Integer> entry=it.next();
+							vmTohost.put(entry.getKey(), entry.getValue());
+						}
+						bestSolution=new Solution(pso.getBestSolution().getBestLoad(),pso.getBestSolution().getBanlanceDegree(),vmTohost);
+						
+						System.out.println(g+"  "+i+" "+ants[i].getBestLoad()+"   "+ants[i].getBanlanceDegree());
+					}
+					
+				}
+			  
+			}
+			// 更新信息素
+			updatePheromone();
+			// 重新初始化蚂蚁
+			for (int i = 0; i < antNum; i++) {
+				ants[i].reset();
+				ants[i].init(distance, allowed, update);
+			}
+		}
+		System.out.println("g="+g);
+		// 打印最佳结果
+		printOptimal();
+	}
+	/**
+	 * 获取唯一解
+	 */
+	private void printOptimal() {
+		Solution tempSolution=bestSolution;
+		System.out.println(tempSolution.getVmTohost());
+		System.out.println(tempSolution.getBestLoad());
+		System.out.println(tempSolution.getBanlanceDegree());
+	}
+
+	/**
+	 * 更新信息素
+	 */
+	private void updatePheromone() {
+		//信息素挥发
+		for(int i=0;i<vmList.size();i++){
+			for(int j=0;j<hostList.size();j++){
+				pheromone[i][j]=pheromone[i][j] * (1 - rho);
+			}
+		}
+		//信息素更新
+		for(int i=0;i<vmList.size();i++){
+			for(int j=0;j<hostList.size();j++){
+				for(int k=0;k<antNum;k++){
+					pheromone[i][j]+=ants[k].getDelta()[i][j];
+					if(pheromone[i][j]>15)
+						pheromone[i][j]=15;
+					if(pheromone[i][j]<0.000001)
+						pheromone[i][j]=0.000001;
+				}
+			}
+		}
+	}
+
+	public static double[][] getPheromone() {
+		return pheromone;
+	}
+
+	public Solution getBestSolution() {
+		return bestSolution;
+	}
+
+	public void setBestSolution(Solution bestSolution) {
+		this.bestSolution = bestSolution;
+	}
+
+	public List<Vm> getVmList() {
+		return vmList;
+	}
+
+	public void setVmList(List<Vm> vmList) {
+		this.vmList = vmList;
+	}
+
+	public List<Host> getHostList() {
+		return hostList;
+	}
+
+	public void setHostList(List<Host> hostList) {
+		this.hostList = hostList;
+	}
+
+	public Map<Integer, Host> getHostById() {
+		return hostById;
+	}
+
+	public void setHostById(Map<Integer, Host> hostById) {
+		this.hostById = hostById;
+	}
+
+	public Map<String, Vm> getVmByUid() {
+		return vmByUid;
+	}
+
+	public void setVmByUid(Map<String, Vm> vmByUid) {
+		this.vmByUid = vmByUid;
+	}
+
+	public Map<String, ArrayList<Host>> getAllowed() {
+		return allowed;
+	}
+
+	public void setAllowed(Map<String, ArrayList<Host>> allowed) {
+		this.allowed = allowed;
+	}
+	
+	
+
+	
+}

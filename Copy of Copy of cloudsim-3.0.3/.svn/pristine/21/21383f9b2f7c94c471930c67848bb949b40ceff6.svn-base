@@ -1,0 +1,221 @@
+package org.cloudbus.cloudsim.hust.migrate;
+
+import java.util.ArrayList;
+import java.util.Map;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.provisioners.UtilProvisioner;
+
+//K-means算法实现
+
+public class KMeans {
+	private UtilProvisioner utilProvisioner;
+	final  int ClassCount = 3;// 聚类的数目
+	final  int InstanceNumber;// 样本数目
+	final  int FieldCount ;// 样本属性数目
+	private double[][] data;// 存放数据的矩阵
+	private double[][] classData;// 每个类的均值中心
+	private ArrayList<ArrayList<Host>> result;// 存放每次变换结果的矩阵
+	private Map<Integer,Host> hostById;
+
+	// 构造函数，初始化
+	public KMeans(UtilProvisioner utilProvisioner) {
+		this.utilProvisioner=utilProvisioner;
+		InstanceNumber = utilProvisioner.getUtil().length;
+		FieldCount = utilProvisioner.getUtil()[0].length;
+		data=utilProvisioner.getUtil();
+		classData = new double[ClassCount][FieldCount];
+		hostById=utilProvisioner.getHostById();
+		result = new ArrayList<ArrayList<Host>>(ClassCount);
+	}
+
+	/*
+	 * 聚类过程，主要分为两步 1.循环找初始点 2.不断调整直到分类不再发生变化
+	 */
+	public void cluster() {
+		// 标记是否需要重新找初始点
+		boolean needUpdataInitials = true;
+		// 找初始点的迭代次数
+		int times = 1;
+		// 找初始点
+		while (needUpdataInitials) {
+			needUpdataInitials = false;
+			result.clear();
+			System.out.println("Find Initials Iteration" + (times++)+ "time(s)");
+			// 一次找初始点的尝试和根据初始点的分类
+			findInitials();
+			firstClassify();
+		}
+		
+		Adjust();// 找到合适的初始点后,不断的调整均值中心和分类，直到不再发生任何变化
+	}
+
+	/**
+	 * 寻找3个初始点
+	 */
+	public void findInitials() {
+		int i, j, a=0, b=0;// a,b为标志距离最远的两个向量的索引
+		double maxDis = 0;// 最远距离
+		int alreadyCls = 2;// 已经找到的初始点个数
+		ArrayList<Integer> initials = new ArrayList<Integer>();// 存放已经标记为初始点的向量索引
+		
+		for (i=0; i < InstanceNumber; i++) {
+			for (j = i + 1; j < InstanceNumber; j++) {
+				double newDis = calDis(data[i], data[j]);
+				if (maxDis < newDis) {// 找出最大的距离并记录下来
+					a = i;
+					b = j;
+					maxDis = newDis;
+				}
+			}
+		}
+
+		// 将前两个初始点记录下来
+		initials.add(a);
+		initials.add(b);
+		classData[0] = data[a];
+		classData[1] = data[b];
+
+		// 在结果中新建存放某样本索引的对象，并把初始点添加进去
+		ArrayList<Host> resultOne = new ArrayList<Host>();
+		ArrayList<Host> resultTwo = new ArrayList<Host>();
+		resultOne.add(hostById.get(a));
+		resultTwo.add(hostById.get(b));
+		result.add(resultOne);
+		result.add(resultTwo);
+
+		// 找到剩余的几个初始点
+		while (alreadyCls < ClassCount) {
+			double maxMin = 0;
+			int newClass = -1;
+
+			// 找最小值中的最大值
+			for (i=0; i < InstanceNumber; i++) {
+				double min = 0;
+				double newMin = 0;
+				// 找和已有类的最小值
+				if (initials.contains(i))
+					continue;
+				for (j = 0; j < alreadyCls; j++) {
+					newMin = calDis(data[i], classData[j]);
+					if (min == 0 || newMin < min)
+						min = newMin;
+				}
+
+				// 新最小距离较大
+				if (min > maxMin) {
+					maxMin = min;
+					newClass = i;
+				}
+			}
+			// 添加到均值集合和结果集合中
+			initials.add(newClass);
+			classData[alreadyCls++] = data[newClass];
+			
+			ArrayList<Host> rslt = new ArrayList<Host>();
+			rslt.add(hostById.get(newClass));
+			result.add(rslt);
+		}
+	}
+
+	// 第一次分类
+	public void firstClassify() {
+		// 根据初始向量分类
+		for (int i = 0; i < InstanceNumber; i++) {
+			double min = 0;
+			int clsId = -1;
+			for (int j = 0; j < classData.length; j++) {
+				// 欧式距离
+				double newMin = calDis(classData[j], data[i]);
+				if (clsId == -1 || newMin < min) {
+					clsId = j;
+					min = newMin;
+				}
+
+			}
+			// 本身不再添加
+			if (!result.get(clsId).contains(hostById.get(i)))
+				result.get(clsId).add(hostById.get(i));
+		}
+	}
+
+	// 迭代分类，直到各个类的数据不再变化
+	public void Adjust() {
+		boolean change = true;// 记录是否发生变化
+		int times = 1;// 循环的次数
+		while (change) {
+			change = false;// 复位
+			System.out.println("Adjust Iteration" + (times++) + "time(s)");
+
+			// 计算每个类的均值
+			for (int i = 0; i < ClassCount; i++) {
+				ArrayList<Host> cls = result.get(i);// 原有的数据
+				double[] newMean = new double[FieldCount];// 新的均值
+				
+				for (Host host : cls) {// 计算均值
+					for (int j = 0; j < FieldCount; j++)
+						newMean[j] += data[host.getId()][j];
+				}
+				for (int j = 0; j < FieldCount; j++)
+					newMean[j] /= cls.size();
+				if (!compareMean(newMean, classData[i])) {
+					classData[i] = newMean;
+					change = true;
+				}
+			}
+			if(!change){
+				break;//中心点全部没有变化，循环结束，否则重新分配
+			}
+			// 清空之前的数据
+			for (ArrayList<Host> cls : result)
+				cls.clear();
+
+			// 重新分配
+			for (int i = 0; i < InstanceNumber; i++) {
+				double min = 0;
+				int clsId = -1;
+				for (int j = 0; j < classData.length; j++) {
+					double newMin = calDis(classData[j], data[i]);
+					if (clsId == -1 || newMin < min) {
+						clsId = j;
+						min = newMin;
+					}
+				}
+				result.get(clsId).add(hostById.get(i));
+			}
+		}
+	}
+
+	/**
+	 * 计算a样本和b样本的欧式距离作为不相似度
+	 * @param a  样本a
+	 * @param b  样本b
+	 * @return 欧式距离长度
+	 */
+	private double calDis(double[] aVector, double[] bVector) {
+		double dis = 0;
+		/* 最后一个数据在训练集中为结果，所以不考虑 */
+		for (int i = 0; i < aVector.length; i++)
+			dis += Math.pow(bVector[i] - aVector[i], 2);
+		dis = Math.sqrt(dis);
+		return dis;
+	}
+
+	/**
+	 * 判断两个均值向量是否相等
+	 * @param a  向量a
+	 * @param b  向量b
+	 * @return
+	 */
+	private boolean compareMean(double[] a, double[] b) {
+		if (a.length != b.length)
+			return false;
+		for (int i = 0; i < a.length; i++) {
+			if (a[i] > 0 && b[i] > 0 && a[i] != b[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+}

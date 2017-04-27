@@ -1,0 +1,205 @@
+package org.cloudbus.cloudsim.hust.ant;
+
+import java.util.HashMap;
+import java.util.Vector;
+
+import org.cloudbus.cloudsim.hust.base.PhysicalMachine;
+import org.cloudbus.cloudsim.hust.base.VirtualMachine;
+import org.cloudbus.cloudsim.hust.utils.Utils;
+
+import java.util.Map.Entry;
+
+
+public class ACO {
+	static Utils utils = new Utils();
+	// 很多参数需要从初始化中获得传值
+	private Ant[] ants; // 蚂蚁
+	private int antNum; // 蚂蚁数量
+	private int MAX_GEN; // 运行代数
+
+	double[][] pheromone; // 信息素矩阵，所有蚂蚁共享的，通过它作为纽带
+	private int physicalMachineNum; // 物理主机数量
+	private int virtualMachineNum; // 虚拟机数量
+	
+	private double bestLoadDegree = 1.0 * Integer.MAX_VALUE; // 最佳负载均衡度
+
+	PhysicalMachine [] origin_pm; //物理机，虚拟机的原始资源
+	VirtualMachine [] origin_vm;
+	
+	Vector<Integer> bestSequence;//每只蚂蚁每次循环输出一个方案
+	
+	HashMap<Integer,Vector<Integer>>bestDeployMap;  //最佳部署映射方案
+	
+	PhysicalMachine [] remainResource;  //记录最优负载下的物理机的剩余资源
+	
+	// 三个参数
+	private float alpha;
+	private float beta;
+	private float rho;
+	
+	//最大最小信息素设置
+	final double maxValue=15;
+	final double minValue=0.01;
+
+	public ACO(){}
+	
+	public ACO(final PhysicalMachine[] physicalMachine,final VirtualMachine[] virtualMachine, 
+			int antnum, int gen, float alpha, float beta, float rho) {
+		//初始化原始资源量
+		this.origin_pm=physicalMachine.clone();
+		this.origin_vm=virtualMachine.clone();
+		
+		// 初始化物理机，虚拟机数量
+		this.physicalMachineNum = physicalMachine.length; 
+		this.virtualMachineNum = virtualMachine.length;
+		
+		this.antNum = antnum; // 初始化蚂蚁数量
+		ants = new Ant[this.antNum];// 初始蚁群规模
+		MAX_GEN = gen;// 初始化迭代代数
+
+		//初始化信息素参数
+		this.alpha = alpha; // 计算转移概率需要使用的参数
+		this.beta = beta;
+		this.rho = rho;
+
+	}
+
+	//蚁群全局初始化
+	public void init() {
+		// 构造信息素矩阵
+		this.pheromone = new double[this.virtualMachineNum][this.physicalMachineNum];
+
+		// 初始的信息素浓度，这个矩阵是全局共有的
+		for (int i = 0; i < virtualMachineNum; i++) {
+			for (int j = 0; j < physicalMachineNum; j++) {
+				pheromone[i][j] = 0.5f; // 初始的信息素浓度设置为0.5
+			}
+		}
+
+		// 初始化最佳负载均衡度
+		bestLoadDegree = Integer.MAX_VALUE; // 初始化最优路径长度
+		
+		//初始化最佳放置序列，最佳映射表，物理机的剩余资源
+		this.bestSequence=new Vector<Integer>(this.virtualMachineNum);
+		this.bestDeployMap=new HashMap<Integer,Vector<Integer>>();
+		this.remainResource=new PhysicalMachine[physicalMachineNum];
+
+		//初始化每只蚂蚁
+		for (int i = 0; i < antNum; i++) {
+			// 使用物理机向量，虚拟机向量构造每只蚂蚁
+			ants[i] = new Ant(this.origin_vm.clone(), this.origin_pm.clone());// 使用随机选择的虚拟机来构造蚂蚁
+			// 为蚂蚁传入必要的信息素参数
+			ants[i].init(alpha, beta, antNum); // 这里初始化时，每只蚂蚁都要进行第一步的选择
+		}
+	}
+
+	// 主函数
+	public void solve() {
+		// 迭代MAX_GEN次
+		for (int g = 0; g < MAX_GEN; g++) {
+			// antNum只蚂蚁,每只蚂蚁搜索一遍
+			for (int i = 0; i < antNum; i++) {// 控制虚拟机的个数
+				// 每一个虚拟机调用一次
+				int index,size;
+				size=this.virtualMachineNum;
+				
+				//每只蚂蚁独立的选择物理机
+				for(index=1;index<size;index++){
+					//【这里面，全局信息素矩阵作为参数，传递给每只蚂蚁非常重要！！！】
+					ants[i].selectNext(this.origin_vm,pheromone,index);
+				}
+				
+				//蚂蚁生成一个部署方案
+				if(ants[i].deploySequence.size()==size){
+					// 所有虚拟机被部署在物理主机上时，计算当前这种部署方案 的负载不均衡度
+					if (ants[i].getLoadDegree() < this.bestLoadDegree) {
+						this.bestLoadDegree = ants[i].getLoadDegree();// 保存最优结果
+//						System.out.println(this.bestLoadDegree);
+						this.bestSequence=ants[i].deploySequence;
+						this.bestDeployMap=ants[i].getDeployMap();
+						this.remainResource=ants[i].getPhysicalMachine();
+					}
+				}
+			}
+
+			// 每一代寻优结束后，进行信息素的更新
+			updatePheromone();
+
+			// 重新进行初始化构造
+			reConstruct();
+		}
+		// 打印最佳结果
+//		printOptimal();
+	}
+
+	// 重新对蚁群进行初始化
+	public void reConstruct() {
+		// 每一代寻优后[可以算出每一代算出的最优结果]，对蚂蚁重新进行初始化 [每一代蚂蚁共享一个禁忌表，共享一个信息素矩阵]
+		for (int i = 0; i < this.antNum; i++) { // 重新为每只蚂蚁进行初始化
+			this.ants[i] = new Ant(this.origin_vm.clone(), this.origin_pm.clone());
+			this.ants[i].init(this.alpha, this.beta, this.antNum);
+		}
+	}
+
+	// 最新的环境信息素 ，需要修改
+	private void updatePheromone() {
+		// 上一轮保留下来的信息素浓度
+		for (int i = 0; i < virtualMachineNum; i++)
+			for (int j = 0; j < physicalMachineNum; j++)
+				pheromone[i][j] = pheromone[i][j] * (1 - rho); // rho是信息素挥发因子
+
+		// 将挥发后的信息素+蚂蚁本轮新留下下的信息素
+		for(int i=0;i<virtualMachineNum;i++){
+			for(int j=0;j< physicalMachineNum;j++){
+				for(int k=0;k<antNum;k++){
+					pheromone[i][j]+=ants[k].getDelta()[i][j]; //每只蚂蚁新留下的信息素
+					if(pheromone[i][j]>this.maxValue) //信息素上下界设置
+						pheromone[i][j]=this.maxValue;
+					if(pheromone[i][j]<this.minValue)
+						pheromone[i][j]=this.minValue;
+				}
+			}
+		}
+	}
+
+	private void printOptimal() {
+		 double loaddegree=this.bestLoadDegree;
+		 System.out.println("\n---------------------------------------------------------------------");
+		 System.out.println("------------------  【6】Ant Colony Optimization Algorithm--------------");
+		 System.out.println("-----------------------------------------------------------------------");
+		 System.out.println("\nloadDegree="+loaddegree+"\n");
+		 
+		 Utils.printUtilInfo(origin_pm, this.remainResource);
+		 
+		 System.out.println("----------------------------DeployMap----------------------------------");
+		 for(Entry<Integer, Vector<Integer>> entry:this.bestDeployMap.entrySet()){
+			Integer key1=entry.getKey();
+			Vector<Integer>value1=entry.getValue();
+			 System.out.println("pm_index="+key1+"================"+"vm_index_set="+value1.toString());
+		}
+		
+		System.out.println("\n-------------------The Remaining PhysicalMachine Resource----------------");
+		
+		for(int index=0;index<this.remainResource.length;index++)
+			System.out.println(this.remainResource[index]);
+		
+	}
+
+	public void printVector(Vector<Integer>vector){
+		for(Integer lee:vector)
+			System.out.print(lee+" ");
+		System.out.println();
+		
+	}
+
+	public Vector<Integer> getBestSequence() {
+		return bestSequence;
+	}
+
+	public void setBestSequence(Vector<Integer> bestSequence) {
+		this.bestSequence = bestSequence;
+	}
+	
+	
+
+}

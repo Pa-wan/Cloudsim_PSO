@@ -1,0 +1,118 @@
+package org.cloudbus.cloudsim.policy.VmsToHosts;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.VmAllocationPolicy;
+import org.cloudbus.cloudsim.hust.aco.ACO;
+
+public class VmAllocationPolicyACO extends VmAllocationPolicy{
+	private Map<String, Integer> vmToHost;
+	private Map<Integer,ArrayList<Integer>> vmsInHost;
+	private List<Vm> vmList;
+
+	public VmAllocationPolicyACO(List<? extends Host> list) {
+		super(list);
+	}
+
+	@Override
+	public boolean allocateHostForVm(Vm vm) {
+		return false;
+	}
+
+	@Override
+	public boolean allocateHostForVm(Vm vm, Host host) {
+		return false;
+	}
+	
+	/**
+	 * 算法的主要调用逻辑以及结果的获取
+	 */
+	@Override
+	public List<Map<String, Object>> optimizeAllocation(List<? extends Vm> vmList) {
+		int antNum=20,gen=30;
+		double alpha=1,beta=3,rho=0.3;
+		List<Vm> vms=(List<Vm>) vmList;
+		this.vmList=vms;
+		ACO aco=new ACO(antNum,vms,getHostList(),gen,alpha,beta,rho);
+		aco.solve();
+		vmToHost=aco.getBestSolution().getVmTohost();
+		vmsInHost=new HashMap<Integer, ArrayList<Integer>>();
+		//在aco程序中，由于减少vmList，hostList的重复创建，每次循环结束重置，二者状态信息不能保存，序列化太复杂
+		//解决方法：按照放置方案重新部署一次即可,最终解
+		Iterator<Entry<String,Integer>> it=vmToHost.entrySet().iterator();
+		while(it.hasNext()){
+			Entry<String,Integer> entry=it.next();
+			Host host=aco.getHostById().get(entry.getValue());
+			Vm vm=aco.getVmByUid().get(entry.getKey());
+			if(!vmsInHost.containsKey(host.getId())){
+				ArrayList<Integer> list=new ArrayList<Integer>();
+				list.add(vm.getId());
+				vmsInHost.put(host.getId(), list);
+			}else{
+				vmsInHost.get(host.getId()).add(vm.getId());
+			}
+			host.vmCreate(vm);//更新资源，CurrentAllocatedMips,CurrentAllocatedSize
+			vm.setCurrentAllocatedSize(vm.getSize());
+			List<Double> list=new ArrayList<Double>();
+			list.add(vm.getCurrentRequestedTotalMips());
+			vm.setCurrentAllocatedMips(list);
+			vm.setCurrentAllocatedBw(vm.getBw());
+			vm.setCurrentAllocatedRam(vm.getRam());
+		}
+		Object map=vmToHost;
+		List<Map<String, Object>> list=new ArrayList<Map<String,Object>>();
+		list.add((Map<String, Object>)map);
+		
+		Iterator<Entry<Integer, ArrayList<Integer>>> itor=vmsInHost.entrySet().iterator();
+		while(itor.hasNext()){
+			Entry<Integer, ArrayList<Integer>> entry=itor.next();
+			System.out.print(entry.getKey()+":size="+entry.getValue().size()+"   ");
+			for(Integer i:entry.getValue())
+			  System.out.print(i+"  ");
+			System.out.println();
+		}
+		return list;
+	}
+
+	@Override
+	public void deallocateHostForVm(Vm vm) {
+		
+	}
+
+	@Override
+	public Host getHost(Vm vm) {
+		int id=vmToHost.get(vm.getUid());
+		for(Host host:getHostList()){
+			if(host.getId()==id)
+				return host;
+		}
+		return null;
+	}
+
+	@Override
+	public Host getHost(int vmId, int userId) {
+		String Uid=userId + "-" + vmId;
+		int id=vmToHost.get(Uid);
+		for(Host host:getHostList()){
+			if(host.getId()==id)
+				return host;
+		}
+		return null;
+	}
+
+	public List<Vm> getVmList() {
+		return vmList;
+	}
+
+	public void setVmList(List<Vm> vmList) {
+		this.vmList = vmList;
+	}
+
+}

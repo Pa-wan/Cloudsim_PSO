@@ -1,0 +1,67 @@
+package org.cloudbus.cloudsim.hust.pso;
+
+import org.cloudbus.cloudsim.hust.pso.Particle;
+
+/**
+ * Base Fitness Function
+ */
+public  class FitnessFunction {
+
+	/** Should this funtion be maximized or minimized */
+	boolean maximize;
+
+	//-------------------------------------------------------------------------
+	// Constructors
+	//-------------------------------------------------------------------------
+
+	/** Default constructor */
+	public FitnessFunction() {
+		maximize = true; // Default: Maximize
+	}
+
+	/**
+	 * Constructor 
+	 * @param maximize : Should we try to maximize or minimize this function?
+	 */
+	public FitnessFunction(boolean maximize) {
+		this.maximize = maximize;
+	}
+
+
+	/**
+	 * Evaluates a particles 
+	 * @param particle : Particle to evaluate
+	 * @return Fitness function for a particle
+	 * 评估函数可以写成多目标的形式。使得负载不均衡度低同时使得物理机使用个数少
+	 */
+	public double evaluate(Particle particle) {
+		double fit=particle.getLoadDegree();
+		//决定取最大化还是最小化
+		particle.setFitness(fit, maximize);
+		return fit;
+	}
+	/**
+	 * Is 'otherValue' better than 'fitness'?
+	 * @param fitness
+	 * @param otherValue
+	 * @return true if 'otherValue' is better than 'fitness'
+	 */
+	public boolean isBetterThan(double fitness, double otherValue) {
+		if (maximize) {
+			if (otherValue > fitness) return true;
+		} else {
+			if (otherValue < fitness) return true;
+		}
+		return false;
+	}
+	
+
+	/** Are we maximizing this fitness function? */
+	public boolean isMaximize() {
+		return maximize;
+	}
+
+	public void setMaximize(boolean maximize) {
+		this.maximize = maximize;
+	}
+}

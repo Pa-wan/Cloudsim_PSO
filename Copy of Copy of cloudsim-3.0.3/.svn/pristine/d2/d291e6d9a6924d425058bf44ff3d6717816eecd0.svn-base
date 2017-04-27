@@ -1,0 +1,350 @@
+package org.cloudbus.cloudsim.ui;
+
+import java.awt.Dimension;
+import java.awt.Toolkit;
+import java.util.Random;
+
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.custom.SashForm;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.layout.FormAttachment;
+import org.eclipse.swt.layout.FormData;
+import org.eclipse.swt.layout.FormLayout;
+import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Dialog;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Group;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.swt.widgets.Spinner;
+import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.TableColumn;
+import org.eclipse.swt.widgets.TableItem;
+import org.eclipse.swt.widgets.Text;
+import org.eclipse.swt.widgets.Tree;
+import org.eclipse.swt.widgets.TreeItem;
+import org.eclipse.wb.swt.SWTResourceManager;
+
+public class UserFrame extends Dialog {
+
+	protected Object result;
+	protected Shell shell;
+	private Label lblNewLabel;
+	private Text userId;
+	private Text pwd;
+	private Label label;
+	private Button updatePwd;
+	private Text registerDate;
+	private Label lblNewLabel_1;
+	private Group requestGp;
+	private Label lblCpu;
+	private Spinner numOfCpu;
+	private Label label_1;
+	private Label lblRam;
+	private Spinner ram;
+	private Label lblNewLabel_2;
+	private Label label_2;
+	private Spinner bw;
+	private Label lblMbps;
+	private Label lblStorage;
+	private Spinner storage;
+	private Label lblGb;
+	private Button submit;
+	private Button reset;
+	private Group userInfoGp;
+	private Table resource;
+	private Group provisorGp;
+	private Table resourceUtil;
+
+	/**
+	 * Create the dialog.
+	 * @param parent
+	 * @param style
+	 */
+	public UserFrame(Shell parent, int style) {
+		super(parent, style);
+		setText("SWT Dialog");
+	}
+
+	/**
+	 * Open the dialog.
+	 * @return the result
+	 */
+	public Object open() {
+		MainFrame.shell.setVisible(false);
+		createContents();
+		shell.open();
+		shell.layout();
+		Display display = getParent().getDisplay();
+		while (!shell.isDisposed()) {
+			if (!display.readAndDispatch()) {
+				display.sleep();
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Create contents of the dialog.
+	 */
+	private void createContents() {
+		shell = new Shell(getParent(), getStyle());
+		shell.setSize(699, 500);
+		shell.setText("用户权限");
+		Dimension dm = Toolkit.getDefaultToolkit().getScreenSize();
+		shell.setBounds((int)(dm.getWidth()-1000)/2,(int)(dm.getHeight()-700)/2, 1000, 700);
+		shell.setLayout(new FormLayout());
+		
+		SashForm sashForm = new SashForm(shell, SWT.NONE);
+		FormData formData = new FormData();
+		formData.left = new FormAttachment(0, 3);
+		formData.right = new FormAttachment(100, -3);
+		formData.top = new FormAttachment(0, 0);
+		formData.bottom = new FormAttachment(100, -25);
+		sashForm.setLayoutData(formData);
+		
+		final Tree tree = new Tree(sashForm, SWT.BORDER);
+		tree.setFont(SWTResourceManager.getFont("微软雅黑", 12, SWT.NORMAL));
+		
+		final TreeItem userInfo = new TreeItem(tree, SWT.NONE);
+		userInfo.setFont(SWTResourceManager.getFont("微软雅黑", 12, SWT.NORMAL));
+		userInfo.setText("用户信息");
+		
+		final TreeItem request = new TreeItem(tree, SWT.NONE);
+		request.setFont(SWTResourceManager.getFont("微软雅黑", 12, SWT.NORMAL));
+		request.setText("资源申请");
+		
+		final TreeItem provisor = new TreeItem(tree, SWT.NONE);
+		provisor.setFont(SWTResourceManager.getFont("微软雅黑", 12, SWT.NORMAL));
+		provisor.setText("资源监控");
+		
+		final Composite composite = new Composite(sashForm, SWT.NONE);
+		composite.setLayout(new FormLayout());
+		
+		provisorGp = new Group(composite, SWT.NONE);
+		FormData fd_provisorGp = new FormData();
+		fd_provisorGp.bottom = new FormAttachment(100);
+		fd_provisorGp.right = new FormAttachment(100, -3);
+		fd_provisorGp.top = new FormAttachment(0, 0);
+		fd_provisorGp.left = new FormAttachment(0, 3);
+		provisorGp.setLayoutData(fd_provisorGp);
+		provisorGp.setText("资源监控");
+		provisorGp.setLayout(new FormLayout());
+		
+		resource = new Table(provisorGp, SWT.BORDER | SWT.FULL_SELECTION);
+		FormData fd_resource = new FormData();
+		fd_resource.bottom = new FormAttachment(50);
+		fd_resource.right = new FormAttachment(100, -3);
+		fd_resource.top = new FormAttachment(0, 0);
+		fd_resource.left = new FormAttachment(0, 3);
+		resource.setLayoutData(fd_resource);
+		resource.setHeaderVisible(true);
+		resource.setLinesVisible(true);
+		
+		TableColumn vmIdClm = new TableColumn(resource, SWT.NONE);
+		vmIdClm.setWidth(86);
+		vmIdClm.setText("虚拟机编号");
+		
+		TableColumn numCpuClm = new TableColumn(resource, SWT.NONE);
+		numCpuClm.setWidth(70);
+		numCpuClm.setText("CPU核数");
+		
+		TableColumn hzClm = new TableColumn(resource, SWT.NONE);
+		hzClm.setWidth(73);
+		hzClm.setText("CPU频率");
+		
+		TableColumn ramClm = new TableColumn(resource, SWT.NONE);
+		ramClm.setWidth(64);
+		ramClm.setText("内存");
+		
+		TableColumn bwClm = new TableColumn(resource, SWT.NONE);
+		bwClm.setWidth(65);
+		bwClm.setText("带宽");
+		
+		TableColumn storageClm = new TableColumn(resource, SWT.NONE);
+		storageClm.setWidth(100);
+		storageClm.setText("存储");
+		
+		resourceUtil = new Table(provisorGp, SWT.BORDER | SWT.FULL_SELECTION);
+		FormData fd_resourceUtil = new FormData();
+		fd_resourceUtil.bottom = new FormAttachment(100);
+		fd_resourceUtil.top = new FormAttachment(resource, 20);
+		fd_resourceUtil.right = new FormAttachment(100, -3);
+		fd_resourceUtil.left = new FormAttachment(0, 3);
+		resourceUtil.setLayoutData(fd_resourceUtil);
+		resourceUtil.setHeaderVisible(true);
+		resourceUtil.setLinesVisible(true);
+		
+		TableColumn vmId = new TableColumn(resourceUtil, SWT.NONE);
+		vmId.setWidth(81);
+		vmId.setText("虚拟机编号");
+		
+		TableColumn cpuUtil = new TableColumn(resourceUtil, SWT.NONE);
+		cpuUtil.setWidth(85);
+		cpuUtil.setText("CPU利用率");
+		
+		TableColumn ramUtil = new TableColumn(resourceUtil, SWT.NONE);
+		ramUtil.setWidth(94);
+		ramUtil.setText("内存利用率");
+		
+		TableColumn bwUtil = new TableColumn(resourceUtil, SWT.NONE);
+		bwUtil.setWidth(93);
+		bwUtil.setText("带宽利用率");
+		
+		TableColumn storageUtil = new TableColumn(resourceUtil, SWT.NONE);
+		storageUtil.setWidth(100);
+		storageUtil.setText("存储利用率");
+		
+		userInfoGp = new Group(composite, SWT.NONE);
+		FormData fd_userInfoGp = new FormData();
+		fd_userInfoGp.bottom = new FormAttachment(0, 442);
+		fd_userInfoGp.right = new FormAttachment(0, 503);
+		fd_userInfoGp.top = new FormAttachment(0, 10);
+		fd_userInfoGp.left = new FormAttachment(0, 10);
+		userInfoGp.setLayoutData(fd_userInfoGp);
+		userInfoGp.setText("用户信息");
+		
+		lblNewLabel = new Label(userInfoGp, SWT.NONE);
+		lblNewLabel.setBounds(46, 53, 61, 17);
+		lblNewLabel.setText("用户名：");
+		
+		userId = new Text(userInfoGp, SWT.BORDER);
+		userId.setBounds(124, 50, 73, 23);
+		
+		label = new Label(userInfoGp, SWT.NONE);
+		label.setBounds(46, 97, 61, 17);
+		label.setText("密   码：");
+		
+		pwd = new Text(userInfoGp, SWT.BORDER);
+		pwd.setBounds(124, 94, 73, 23);
+		
+		updatePwd = new Button(userInfoGp, SWT.NONE);
+		updatePwd.setBounds(249, 92, 80, 27);
+		updatePwd.setText("修改");
+		
+		registerDate = new Text(userInfoGp, SWT.BORDER);
+		registerDate.setBounds(124, 147, 73, 23);
+		
+		lblNewLabel_1 = new Label(userInfoGp, SWT.NONE);
+		lblNewLabel_1.setBounds(46, 150, 61, 17);
+		lblNewLabel_1.setText("注册信息：");
+		
+		requestGp = new Group(composite, SWT.NONE);
+		FormData fd_requestGp = new FormData();
+		fd_requestGp.bottom = new FormAttachment(0, 442);
+		fd_requestGp.right = new FormAttachment(0, 493);
+		fd_requestGp.top = new FormAttachment(0, 10);
+		fd_requestGp.left = new FormAttachment(0, 10);
+		requestGp.setLayoutData(fd_requestGp);
+		requestGp.setText("虚拟机申请");
+		
+		lblCpu = new Label(requestGp, SWT.NONE);
+		lblCpu.setBounds(28, 41, 61, 17);
+		lblCpu.setText("CPU：");
+		
+		numOfCpu = new Spinner(requestGp, SWT.BORDER);
+		numOfCpu.setBounds(95, 38, 47, 23);
+		
+		label_1 = new Label(requestGp, SWT.NONE);
+		label_1.setBounds(153, 41, 61, 17);
+		label_1.setText("核");
+		
+		lblRam = new Label(requestGp, SWT.NONE);
+		lblRam.setBounds(28, 84, 61, 17);
+		lblRam.setText("内存：");
+		
+		ram = new Spinner(requestGp, SWT.BORDER);
+		ram.setBounds(95, 84, 47, 23);
+		
+		lblNewLabel_2 = new Label(requestGp, SWT.NONE);
+		lblNewLabel_2.setBounds(153, 87, 61, 17);
+		lblNewLabel_2.setText("GB");
+		
+		label_2 = new Label(requestGp, SWT.NONE);
+		label_2.setBounds(28, 135, 61, 17);
+		label_2.setText("带宽：");
+		
+		bw = new Spinner(requestGp, SWT.BORDER);
+		bw.setBounds(95, 135, 47, 23);
+		
+		lblMbps = new Label(requestGp, SWT.NONE);
+		lblMbps.setBounds(153, 138, 61, 17);
+		lblMbps.setText("Mbps");
+		
+		lblStorage = new Label(requestGp, SWT.NONE);
+		lblStorage.setBounds(28, 188, 61, 17);
+		lblStorage.setText("存储：");
+		
+		storage = new Spinner(requestGp, SWT.BORDER);
+		storage.setBounds(95, 188, 47, 23);
+		
+		lblGb = new Label(requestGp, SWT.NONE);
+		lblGb.setBounds(153, 191, 61, 17);
+		lblGb.setText("GB");
+		
+		submit = new Button(requestGp, SWT.NONE);
+		submit.setBounds(28, 232, 80, 27);
+		submit.setText("提交");
+		
+		reset = new Button(requestGp, SWT.NONE);
+		reset.setBounds(135, 232, 80, 27);
+		reset.setText("重置");
+		
+		Runnable runnable = new Runnable() {
+			@Override
+			public void run() {
+				while (true) {
+					System.out.println(Thread.currentThread().getName());
+					Random r = new Random();
+					final String[] strings = { 0 + "", r.nextDouble() + "",
+							r.nextDouble() + "", r.nextDouble() + "",
+							r.nextDouble() + "" };
+
+					if (!shell.isDisposed())
+						Display.getDefault().asyncExec(new Runnable() {
+							@Override
+							public void run() {
+								resourceUtil.setItemCount(0);// 清空表格
+								TableItem item = new TableItem(resourceUtil,SWT.LEFT);
+								item.setText(strings);
+								System.out.println(Thread.currentThread().getName());
+							}
+						});
+					try {
+						Thread.sleep(10 * 1000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+
+			}
+		};
+		new Thread(runnable).start();
+		
+		tree.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				TreeItem treeItem=tree.getSelection()[0];
+				if(treeItem==userInfo){
+					userInfoGp.setVisible(true);
+					requestGp.setVisible(false);
+					provisorGp.setVisible(false);
+				}else if(treeItem==request){
+					userInfoGp.setVisible(false);
+					requestGp.setVisible(true);
+					provisorGp.setVisible(false);
+					numOfCpu.setSelection(0);//数字重置
+				}else if(treeItem==provisor){
+					userInfoGp.setVisible(false);
+					requestGp.setVisible(false);
+					provisorGp.setVisible(true);
+				}
+			}
+		});
+		
+		sashForm.setWeights(new int[] {1, 3});
+
+	}
+}

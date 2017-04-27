@@ -1,0 +1,148 @@
+package org.cloudbus.cloudsim.hust.contrast_test;
+
+import java.io.File;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Scanner;
+
+import org.cloudbus.cloudsim.hust.base.PhysicalMachine;
+import org.cloudbus.cloudsim.hust.utils.FileUtil;
+import org.cloudbus.cloudsim.hust.base.VirtualMachine;
+
+public class Main {
+	
+	//-------------------------------------------------------------------------
+	// Main
+	//-------------------------------------------------------------------------
+	public static void main(String[] args) throws IOException {
+		//文件路径，将好结果保存起来
+		String file_pm_path="E:\\pm_dir\\"; 
+		String file_vm_path="E:\\vm_dir\\";
+		
+		//分隔符
+		String delimeter=",";
+		String fileType="csv";
+		
+		//产生指定范围，指定数量的物理机
+		int numPm,numVm,index;
+		double first,second,third,fourth;
+		
+		/**--------------------设置不同数量级别的cpu，memory，bandwidth,disk参数-------------------------------*/
+		int maxPm_cpu,minPm_cpu,maxVm_cpu,minVm_cpu;
+		int maxPm_memory,minPm_memory,maxVm_memory,minVm_memory;
+		int maxPm_bandwindth,minPm_bandwindth,maxVm_bandwindth,minVm_bandwindth;
+		int maxPm_disk,minPm_disk,maxVm_disk,minVm_disk;
+		
+		maxPm_cpu=3000;  minPm_cpu=1000;  maxVm_cpu=300;   minVm_cpu=100;
+		maxPm_memory=5000;  minPm_memory=2000;  maxVm_memory=400;   minVm_memory=200;
+		maxPm_bandwindth=7000;  minPm_bandwindth=3000;  maxVm_bandwindth=500;   minVm_bandwindth=300;
+		maxPm_disk=9000;  minPm_disk=7000;  maxVm_disk=600;   minVm_disk=400;
+		
+		/**--------------------设置相同数量级别的cpu，memory，bandwidth,disk参数-------------------------------*/
+		int maxPm,minPm,maxVm,minVm;
+		maxPm=3000;minPm=2000;maxVm=200;minVm=100;
+		
+		
+		@SuppressWarnings("resource")
+		Scanner input=new Scanner(System.in);
+		System.out.print("Number Of Pm=");
+		numPm=input.nextInt();
+		System.out.print("Number Of Vm=");
+		numVm=input.nextInt();
+		
+		PhysicalMachine [] pmArray=new PhysicalMachine[numPm];
+		VirtualMachine  [] vmArray=new VirtualMachine[numVm];
+		
+//		//产生指定范围，指定精度的随机数
+//		for(index=0;index<numPm;index++){
+//			
+//			/**--------------------limit[物理机:虚拟机比例]=1:8 [如物理机数量:虚拟机数量=100:800]-------------------------------*/
+//			//当各项指标不成比例时，RoundRoubin的效果开始变差，BestFit的效果最好
+////			first=Utils.round(Math.random()*(maxPm_cpu-minPm_cpu)+minPm_cpu,2,BigDecimal.ROUND_HALF_UP);
+////			second=Utils.round(Math.random()*(maxPm_memory-minPm_memory)+minPm_memory,2,BigDecimal.ROUND_HALF_UP);
+////			third=Utils.round(Math.random()*(maxPm_bandwindth-minPm_bandwindth)+minPm_bandwindth,2,BigDecimal.ROUND_HALF_UP);
+////			fourth=Utils.round(Math.random()*(maxPm_disk-minPm_disk)+minPm_disk,2,BigDecimal.ROUND_HALF_UP);
+//			
+//			/**--------------------limit[物理机:虚拟机比例]=1:14 [如物理机数量:虚拟机数量=100:1400]-------------------------------*/
+//			//当各项指标成比例时，RoundRoubin的效果最好，BestFit的效果其次
+//			first=Utils.round(Math.random()*(maxPm-minPm)+minPm,2,BigDecimal.ROUND_HALF_UP);
+//			second=Utils.round(Math.random()*(maxPm-minPm)+minPm,2,BigDecimal.ROUND_HALF_UP);
+//			third=Utils.round(Math.random()*(maxPm-minPm)+minPm,2,BigDecimal.ROUND_HALF_UP);
+//			fourth=Utils.round(Math.random()*(maxPm-minPm)+minPm,2,BigDecimal.ROUND_HALF_UP);
+//			
+//			pmArray[index]=new PhysicalMachine(first,second,third,fourth);
+//		}
+//		
+//		//写入物理机文件------------指定后缀类型,使用时间来命名文件，从而产生互不重复的文件
+//		FileUtil.writePmToFile(pmArray,FileUtil.generatePath(file_pm_path,fileType) , delimeter);
+//		
+//		//产生指定范围，指定数量的虚拟机
+//		//产生指定范围，指定精度的随机数
+//		for(index=0;index<numVm;index++){
+//			/**--------------------limit[物理机:虚拟机比例]=1:8 [如物理机数量:虚拟机数量=100:800]-------------------------------*/
+////			first=Utils.round(Math.random()*(maxVm_cpu-minVm_cpu)+minVm_cpu,2,BigDecimal.ROUND_HALF_UP);
+////			second=Utils.round(Math.random()*(maxVm_memory-minVm_memory)+minVm_memory,2,BigDecimal.ROUND_HALF_UP);
+////			third=Utils.round(Math.random()*(maxVm_bandwindth-minVm_bandwindth)+minVm_bandwindth,2,BigDecimal.ROUND_HALF_UP);
+////			fourth=Utils.round(Math.random()*(maxVm_disk-minVm_disk)+minVm_disk,2,BigDecimal.ROUND_HALF_UP);
+//			
+//			
+//			/**--------------------limit[物理机:虚拟机比例]=1:14 [如物理机数量:虚拟机数量=100:1400]-------------------------------*/
+//			first=Utils.round(Math.random()*(maxVm-minVm)+minVm,2,BigDecimal.ROUND_HALF_UP);
+//			second=Utils.round(Math.random()*(maxVm-minVm)+minVm,2,BigDecimal.ROUND_HALF_UP);
+//			third=Utils.round(Math.random()*(maxVm-minVm)+minVm,2,BigDecimal.ROUND_HALF_UP);
+//			fourth=Utils.round(Math.random()*(maxVm-minVm)+minVm,2,BigDecimal.ROUND_HALF_UP);
+//			
+//			vmArray[index]=new VirtualMachine(first,second,third,fourth);
+//		}
+//		//写入虚拟机文件
+//		FileUtil.writeVmToFile(vmArray,FileUtil.generatePath(file_vm_path,fileType) , delimeter);
+		
+		//打印产生的随机数组
+//		System.out.println("-----------------------初始的物理机集合-----------------------");
+//		Utils.printPMArray(pmArray);
+//		System.out.println("\n-----------------------初始的虚拟机集合-----------------------");
+//		Utils.printVMArray(vmArray);
+		
+		/**--------------------------下面这些是辅助性代码-----------------------------------**/
+		//从写入的文件中导入物理机，虚拟机信息,便于使用相同的数据进行试验
+		//每次都从指定目录中获取最近访问的文件
+		File [] file_pm= FileUtil.getLastModifiedFileFromDir(file_pm_path,1);
+		File [] file_vm= FileUtil.getLastModifiedFileFromDir(file_vm_path,1);
+		
+		//获取最近访问的文件的文件名
+		String [] pm_file_name=FileUtil.getLastModifiedFileName(file_pm);
+		String [] vm_file_name=FileUtil.getLastModifiedFileName(file_vm);
+		
+		//使用目录名加上文件名，构成文件路径，这里取最后修改的一个文件进行修改
+		pmArray=FileUtil.loadPmFromFile(file_pm_path+pm_file_name[0], delimeter,numPm);
+		vmArray=FileUtil.loadVmFromFile(file_vm_path+vm_file_name[0], delimeter,numVm);
+		
+				// 使用FF算法和RF算法作对比试验
+		FirstFit ff=new FirstFit(pmArray, vmArray);
+		ff.firstFit();
+		
+		RandomFit rf=new RandomFit(pmArray, vmArray);
+		rf.randomFit();
+		
+		RoundRobinFit rrf=new RoundRobinFit(pmArray, vmArray);
+		rrf.roundrobinFit();
+		
+		BestFit bf=new BestFit(pmArray, vmArray);
+		bf.bestFit();
+		
+		/** 
+		 * 通过最佳适应算法获取粒子的一个较好的初始解，让后以较好的初始解作为基础，进行进化迭代
+		 */
+		PSOFit pf=new PSOFit(pmArray, vmArray);
+		pf.psoFit();
+		
+		/**
+		 * 蚁群算法
+		 */
+		ACOFit af=new ACOFit(pmArray, vmArray);
+		af.acoFit();
+	}
+}
+

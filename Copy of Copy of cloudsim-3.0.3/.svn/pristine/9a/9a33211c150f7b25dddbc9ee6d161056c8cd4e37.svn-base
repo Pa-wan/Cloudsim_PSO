@@ -1,0 +1,43 @@
+package org.cloudbus.cloudsim.policy;
+
+import org.cloudbus.cloudsim.VmAllocationPolicy;
+import org.cloudbus.cloudsim.hust.migrate.HotSpotDetection;
+import org.cloudbus.cloudsim.hust.migrate.Migration;
+import org.cloudbus.cloudsim.provisioners.UtilProvisioner;
+
+public class DynamicProcess {
+	private UtilProvisioner utilProvisioner;
+	private HotSpotDetection hotSpotDetection;
+	private Migration migration;
+	
+	public DynamicProcess(VmAllocationPolicy vmAllocationPolicy){
+		utilProvisioner=new UtilProvisioner(vmAllocationPolicy);
+		hotSpotDetection=new HotSpotDetection(utilProvisioner);
+		migration=new Migration(hotSpotDetection);
+	}
+	
+	public void dynamicRun(){
+		for(int i=0;i<UtilProvisioner.capacity+1;i++)
+			utilProvisioner.updateUtil();
+			
+		while(true){
+			try {
+				utilProvisioner.updateUtil();
+				hotSpotDetection.classify();
+				migration.calcuMd();
+				//System.out.println("migration before:"+migration.getBanlanceDegree());
+				migration.copy();
+				System.out.print("before:"+migration.getHotSpotDetection().getHighLoaded().size());
+				migration.clearHotSpots();
+				migration.calcuMd();
+				System.out.print("after:"+migration.getHotSpotDetection().getHighLoaded().size());
+				System.out.println("migrationTimes:"+migration.getMigrationTimes()+"  "+migration.change());
+				//System.out.println("migration after:"+migration.getBanlanceDegree());
+				Thread.sleep(5*1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+}

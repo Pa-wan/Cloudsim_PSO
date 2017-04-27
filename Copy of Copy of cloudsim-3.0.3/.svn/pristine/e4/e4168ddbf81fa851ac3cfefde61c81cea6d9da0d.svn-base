@@ -1,0 +1,75 @@
+package org.cloudbus.cloudsim.provisioners;
+
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.VmAllocationPolicy;
+import org.cloudbus.cloudsim.hust.aco.ACO;
+import org.cloudbus.cloudsim.policy.ConstantConfig;
+
+public class UtilProvisionerReal extends UtilProvisioner{
+	
+	public UtilProvisionerReal(VmAllocationPolicy policy) {
+		super(policy);
+	}
+	
+	@Override
+	public void updateUtil() {
+		VmAllocationPolicy policy=getPolicy();
+		Map<Host,double[]> availableInTime=getAvailableInTime();
+		Map<Integer,Host> hostById=getHostById();
+		Map<Integer,double[]> util=getUtil();
+		Map<Integer,Double> utilAvg=getUtilAvg();
+		double avg[]=getAvg();
+		Map<Host,LinkedList<double[]>> utilTs=getUtilTs();
+		
+		double sumCpu=0,sumMem=0,sumBw=0,sumStorage=0;
+		List<Host> hostList=policy.getHostList();
+		for(Host host:hostList){
+			hostById.put(host.getId(), host);
+			util.put(host.getId(), new double[ConstantConfig.resNum]);
+			
+			availableInTime.get(host)[0]=host.getTotalMips();
+			availableInTime.get(host)[1]=host.getRam();
+			availableInTime.get(host)[2]=host.getBw();
+			availableInTime.get(host)[3]=ACO.storageMap.get(host.getId());
+			//每个虚拟机负载利用率(0~1)
+			List<Vm> vmsInHost=host.getVmList();
+			for(Vm vm:vmsInHost){
+				availableInTime.get(host)[0]-=vm.getCurrentAllocatedMips().get(0);
+				availableInTime.get(host)[1]-=vm.getCurrentAllocatedRam();
+				availableInTime.get(host)[2]-=vm.getCurrentAllocatedBw();
+				availableInTime.get(host)[3]-=vm.getCurrentAllocatedSize();
+			}
+			
+			util.get(host.getId())[0]=(host.getTotalMips()-availableInTime.get(host)[0])/host.getTotalMips();
+			util.get(host.getId())[1]=(host.getRam()-availableInTime.get(host)[1])/(host.getRam()+0.0);
+			util.get(host.getId())[2]=(host.getBw()-availableInTime.get(host)[2])/(host.getBw()+0.0);
+			util.get(host.getId())[3]=(ACO.storageMap.get(host.getId())-availableInTime.get(host)[3])/(ACO.storageMap.get(host.getId())+0.0);
+		
+			sumCpu+=util.get(host.getId())[0];
+			sumMem+=util.get(host.getId())[1];
+			sumBw+=util.get(host.getId())[2];
+			sumStorage+=util.get(host.getId())[3];
+			
+			double tempAvg=(util.get(host.getId())[0]+util.get(host.getId())[1]+util.get(host.getId())[2]+util.get(host.getId())[3])/4;
+			utilAvg.put(host.getId(), tempAvg);			
+			
+			double[] tempUtil=new double[]{util.get(host.getId())[0],util.get(host.getId())[1],util.get(host.getId())[2],util.get(host.getId())[3]};
+			//容量充足直接加入末尾，否则移除第一个
+			if(utilTs.get(host).size()<capacity){
+				utilTs.get(host).addLast(tempUtil);
+			}else{
+				utilTs.get(host).removeFirst();
+				utilTs.get(host).addLast(tempUtil);
+			}
+		}
+		avg[0]=sumCpu/(hostList.size());
+		avg[1]=sumMem/(hostList.size());
+		avg[2]=sumBw/(hostList.size());
+		avg[3]=sumStorage/(hostList.size());
+	}
+}

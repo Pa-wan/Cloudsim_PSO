@@ -1,0 +1,129 @@
+package org.cloudbus.cloudsim.hust.contrast_test;
+
+import java.util.HashMap;
+import java.util.Vector;
+import java.util.Map.Entry;
+
+import org.cloudbus.cloudsim.hust.base.PhysicalMachine;
+import org.cloudbus.cloudsim.hust.utils.Utils;
+import org.cloudbus.cloudsim.hust.base.VirtualMachine;
+
+//首次适应算法
+public class FirstFit {
+	Utils utils;
+	
+	//存放虚拟机到物理机上的映射，key=物理机，value=该物理机上虚拟机列表
+	HashMap<Integer,Vector<Integer>>deployMap;
+	
+	//物理机资源的初始资源量，保存下来，便于计算负载不均衡度
+	PhysicalMachine [] origin_pm;
+	PhysicalMachine [] physicalMachine;
+	VirtualMachine  []  virtualMachine;
+	
+	public FirstFit(PhysicalMachine [] pmArray,VirtualMachine  [] vmArray){
+		//初始化
+		utils=new Utils();
+		this.physicalMachine=pmArray.clone();
+		this.virtualMachine=vmArray.clone();
+		this.origin_pm=pmArray.clone();
+		this.deployMap=new HashMap<Integer,Vector<Integer>>();
+	}
+	
+	public void firstFit(){
+		int index,size,key;
+		Vector<Integer>value;
+		 size=this.virtualMachine.length;
+		 for(index=0;index<size;index++){
+			  //物理机下标
+			 key=getFirstFitIndex(this.virtualMachine[index],this.physicalMachine);
+			  if(key!=-1){
+				  //物理机对应的虚拟机列表
+				  value=this.deployMap.get(key);
+				  if(value==null)
+					  value=new Vector<Integer>();
+				  value.add(index);
+				   this.deployMap.put(key,value);
+			  }
+		 }
+		 
+		 double loaddegree=getLoadDegree();
+		 System.out.println("\n---------------------------------------------------------------------");
+		 System.out.println("----------------------------【1】FirstFit Algorithm---------------------");
+		 System.out.println("-----------------------------------------------------------------------");
+		 System.out.println("\nloadDegree="+loaddegree+"\n");
+		 
+		 //数据中心的资源利用率
+//		 Utils.printUtilInfo(this.origin_pm, this.physicalMachine);
+		 
+		 System.out.println("----------------------------DeployMap----------------------------------");
+		 for(Entry<Integer, Vector<Integer>> entry:this.deployMap.entrySet()){
+			Integer key1=entry.getKey();
+			Vector<Integer>value1=entry.getValue();
+			 System.out.println("pm_index="+key1+"================"+"vm_index_set="+value1.toString());
+		}
+		
+		System.out.println("\n-------------------The Remaining PhysicalMachine Resource----------------");
+		for(index=0;index<physicalMachine.length;index++)
+			System.out.println(physicalMachine[index]);
+	    
+
+	}
+	
+	//首次部署中，不用考虑物理机是否为活动的物理机
+	public int getFirstFitIndex(VirtualMachine vm,PhysicalMachine []pm){
+		int size;
+		int index=-1;  //表示找不到
+		size=pm.length;
+		for(index=0;index<size;index++){
+			if(utils.canDeployDirectly(pm[index], vm)){
+				//修改物理机的剩余资源量
+				double []array=utils.getDiffArray(pm[index], vm);
+				pm[index]=new PhysicalMachine(array);
+				 break;
+			}
+		}
+		return index;
+	}
+	
+	//计算公式,负载不均衡度值在[0,1]之间
+	public double getLoadDegree() {
+		// 【1】求出每种资源R的平均资源利用率
+		double sum_usedCpu, sum_usedMemory, sum_usedBandwidth, sum_usedDisk; // 每一类资源的总的剩余量
+		double aveCpu, aveMemory, aveBandwidth, aveDisk; // 每一类资源的平均利用率
+		sum_usedCpu = sum_usedMemory = sum_usedBandwidth = sum_usedDisk = 0.0; // 剩余资源累加计数器
+		int index, size;
+		size = this.origin_pm.length;
+
+		for (index = 0; index < size; index++) {
+			PhysicalMachine origin_resource, current_resource;
+			origin_resource = this.origin_pm[index]; // 取出使用未使用过的物理机的状态
+			// 【Bug_1】
+			current_resource = this.physicalMachine[index]; // 取出使用了的物理机的状态。
+			sum_usedCpu += (origin_resource.getCpu() - current_resource.getCpu())/origin_resource.getCpu();
+			sum_usedMemory += (origin_resource.getMemory() - current_resource.getMemory())/origin_resource.getMemory();
+			sum_usedBandwidth += (origin_resource.getBandwidth() - current_resource.getBandwidth())/origin_resource.getBandwidth();
+			sum_usedDisk += (origin_resource.getDisk() - current_resource.getDisk())/origin_resource.getDisk();
+		}
+		aveCpu = sum_usedCpu /size; // CPU资源的平均利用率
+		aveMemory = sum_usedMemory / size;// 内存的平均利用率
+		aveBandwidth = sum_usedBandwidth / size;// 带宽资源的平均利用率
+		aveDisk = sum_usedDisk / size;// 硬盘资源的平均利用率
+
+		// 【2】再次遍历,求出负载不均衡度
+		double per_usedCpu, per_usedMemory, per_usedBandwidth, per_usedDisk; // 每一类资源的剩余量
+		per_usedCpu = per_usedMemory = per_usedBandwidth = per_usedDisk = 0;
+		double currsum = 0;
+		for (index = 0; index < size; index++) {
+			PhysicalMachine origin_resource, current_resource;
+			origin_resource = this.origin_pm[index]; // 取出使用未使用过的物理机的状态
+			current_resource = this.physicalMachine[index]; // 取出使用了的物理机的状态。
+			per_usedCpu = (origin_resource.getCpu() - current_resource.getCpu())/origin_resource.getCpu();
+			per_usedMemory = (origin_resource.getMemory() - current_resource.getMemory())/origin_resource.getMemory();
+			per_usedBandwidth = (origin_resource.getBandwidth() - current_resource.getBandwidth())/origin_resource.getBandwidth();
+			per_usedDisk = (origin_resource.getDisk() - current_resource.getDisk())/origin_resource.getDisk();
+			currsum += (Math.abs(per_usedCpu - aveCpu) + Math.abs(per_usedMemory - aveMemory)
+					+ Math.abs(per_usedBandwidth - aveBandwidth) + Math.abs(per_usedDisk - aveDisk));
+		}
+		return currsum / size; // 求出负载不均衡度
+	}
+}

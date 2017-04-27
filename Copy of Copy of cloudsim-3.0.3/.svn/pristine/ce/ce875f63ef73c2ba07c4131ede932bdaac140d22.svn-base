@@ -1,0 +1,1075 @@
+package org.cloudbus.cloudsim.hust.pso;
+
+import java.io.BufferedWriter;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OptionalDataException;
+import java.io.OutputStreamWriter;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.Vector;
+
+import org.cloudbus.cloudsim.hust.base.PhysicalMachine;
+import org.cloudbus.cloudsim.hust.utils.Utils;
+import org.cloudbus.cloudsim.hust.base.VirtualMachine;
+import org.cloudbus.cloudsim.hust.contrast_test.BestFit;
+
+/**
+ * Basic particle
+ * 使用【编码方式二】粒子群算法_虚拟机部署算法【对物理机进行0-1编码】，参考相关论文
+ */
+public class Particle {
+	
+	static Utils utils=new Utils();
+	
+	static Random random=new Random();
+ 
+	/** Best fitness function so far */
+	double localFitness;
+	
+	int NumOfPm;
+	
+	/** Best particles's position so far */
+	int bestPosition[];
+	/** current fitness */
+	double fitness;
+	
+	/**数组长度=物理机个数，值为0或者1;若为0，表示物理机没有被使用，若为1，表示该下标对应的物理机上至少有一个虚拟机
+	 * 记录物理机的使用情况
+	 */
+	int  position[];
+	
+	/**数组的长度=虚拟机的个数，数组中a[index]表示下标为index的虚拟机所映射的物理机下标
+	 * 便于在位置改变时，
+	 *        【1】引入【遗传算法】的思想【对位置进行合理的交叉变异】，变异师注意SLA限制，同时注意负载是否可以进行优化
+	 *            但是，遗传算法中编码是基于二进制的编码，这里使用不妥
+	 *        【2】或者是根据速度公式计算位置的时候，若计算出来的是浮点数位置，进行四舍五入；】
+	 *         同时在计算位置时，需要进行位置的限制
+	 * 使用这种编码方式时：不需要定义加减乘算子，直接略过论文中的实现
+	 *        可以适当的引入领域解[neighthood],
+	 *        计算过程中引入模拟退火算法，以一定的概率选择劣质解，防止粒子群算法陷入局部最优解
+	 */
+	int vm_map_pm_index[];
+	
+	
+	//存放虚拟机到物理机上的映射，key=物理机，value=该物理机上虚拟机列表
+	//对第二中编码方式的比较折衷的选择
+	HashMap<Integer,Vector<Integer>>deployMap;
+	
+	/** Velocity */
+	//数组长度=物理机个数，值为0或者1;若为0，表示对应下标上的物理机上的虚拟机需要调整，1表示不需要调整
+	int velocity[];
+	
+	//粒子在局部最优值下的速度向量
+	int bestvelocity[];
+	
+	//物理机资源的全局使用量，动态变化的，随着粒子位置的调整而改变
+	public static PhysicalMachine [] physicalMachine;
+	
+	//物理机资源的初始资源量，保存下来，便于计算负载不均衡度
+	PhysicalMachine [] origin_pm;
+	int num_pm;
+	
+	public static VirtualMachine  [] virtualMachine;
+	int num_vm;
+	//归一化的资源
+	PhysicalMachine [] pm_normalized;
+	VirtualMachine  [] vm_normalized;
+	
+	public  int roundrobinIndex=0;
+	
+	int usedOfPm; //使用 的物理机个数
+	
+	//-------------------------------------------------------------------------
+	// Constructors
+	//-------------------------------------------------------------------------
+
+	/**
+	 * Constructor 
+	 */
+	public Particle() {
+	}
+
+	/**
+	 * Constructor 
+	 * @param dimension : Particle's dimension
+	 */
+	public Particle(int dimension) {
+		allocate(dimension);
+	}
+
+	/**
+	 * Constructor 
+	 * @param sampleParticle : A sample particles to copy
+	 */
+	public Particle(Particle sampleParticle) {
+		int dimension = sampleParticle.getDimension();
+		allocate(dimension);
+	}
+
+	//-------------------------------------------------------------------------
+	// Methods
+	//-------------------------------------------------------------------------
+
+	/** Allocate memory */
+	public void allocate(int dimension) {
+		position = new int[dimension];
+		bestPosition = new int[dimension];
+		velocity = new int[dimension];
+		this.bestvelocity=new int[dimension];
+		deployMap=new HashMap<Integer,Vector<Integer>>();
+		//初始化粒子的最优解和适应度值
+		localFitness = Double.NaN;
+		fitness = Double.NaN;
+		this.roundrobinIndex=0;
+		//初始化时，每个物理机上都没有放置任何虚拟机
+		for (int i = 0; i < dimension; i++){
+			this.position[i]=0;
+			this.bestPosition[i] =0;
+			this.velocity[i]=0;
+			this.bestvelocity[i]=0;
+		}
+		
+		
+	}
+		//对于每个粒子，每个粒子独享一个物理机资源列表，考虑清楚【全局参数的设置】
+		public  void init(PhysicalMachine[]physicalMachine,VirtualMachine[] virtualMachine,int particleIndex,int numberOfParticles) {
+			this.physicalMachine=physicalMachine.clone();
+			this.num_pm=this.physicalMachine.length;
+			this.origin_pm=physicalMachine.clone();
+			
+			this.virtualMachine=virtualMachine.clone();
+			this.num_vm=this.virtualMachine.length;
+			
+			this.vm_normalized=getNormalized_Vm();
+			this.vm_map_pm_index=new int[virtualMachine.length];
+			
+			this.usedOfPm=0;
+			
+			/**
+			 * ------------------粒子的位置进行初始化-----------------------------
+			 */
+			//根据物理机是否可以放置虚拟机，对位置向量的bit位进行更新，同时对映射表进行更行
+			int index,size,firstfit,newIndex;
+			size=virtualMachine.length;
+			
+			/**--------------------为了形成多样化的初始化种群------------------------------------------*/
+			//将虚拟机标号打乱,这样产生的结果必然比bestfit要好不少
+			int []array_0=createNoRepeatNumber(size); //具有较高的随机性
+			//按照打乱的顺序进行部署
+			
+			for(index=0;index<size;index++){
+				//对应打乱后的虚拟机的真实下标
+				newIndex=array_0[index];
+				
+				VirtualMachine vm=virtualMachine[newIndex];
+				
+				firstfit=getBestFitIndex(newIndex,vm,this.physicalMachine);
+				
+				//不可以放置，else语句略过
+				if(firstfit==-1)
+					continue;
+				
+				else{ //没有使用，修改标记
+					if(this.position[firstfit]==0)
+				       this.position[firstfit]=1;//设置为活动物理机
+				
+				Integer key=firstfit;
+				Vector <Integer>value=this.getDeployMap().get(key);
+				//针对初始化时，value值为空情形
+				if(value==null){
+					value=new Vector<Integer>();
+				}
+				
+				//但不为空是，直接放入
+				value.addElement(newIndex);
+				//放入映射表
+				this.deployMap.put(key, value);
+			    this.vm_map_pm_index[newIndex]=firstfit;
+			
+			/**
+			 * ------------------粒子的速度进行初始化-----------------------------
+			 */
+			int size_pm=this.physicalMachine.length;
+			
+			for (int i = 0; i < size_pm; i++){
+				this.velocity[i]=(random.nextInt()>0.5?1:0);
+			}
+			
+			//获取负载不均衡度，进行初始化赋值,需要修改吗？
+			this.fitness=getLoadDegree();
+			this.localFitness=getLoadDegree();
+			
+			//最优位置的初始化
+			this.bestPosition=this.position.clone();
+			this.usedOfPm++;
+			}
+		}
+	}
+		
+		/**
+		* 【1】Particle Swarm Optimization for Energy-Aware Virtual Machine Placement Optimization in Virtualized Data Centers
+		* 【2】A PSO based VM Resource Scheduling Model for Cloud Computing
+		*这个约束就是在更新完速度和位置后，根据位置速度向量和位置向量的情形，对相应位置向量上物理机上的虚拟机进行重新部署
+		*保证每个粒子对自己独有的物理机上的资源进行更新操作
+		*无论是漏放的，还是因为物理机下标置0而被迫移走的物理机上，重新进行放置
+		*在这个过程中，有些物理机上资源需要复原，有些需要减少
+		* 1-0:资源复原；0-1，资源重新计算；1-1：资源计算，0-0：不变
+		*/
+		//关键在于发现2次中虚拟机因为部署方案发生改变的情况，考虑使用遗传算法的思想，对2个编号为1的物理机上的部分虚拟机进行交换【在形成可行解的前提下】
+		//待交换的物理机选择，选择物理机对集群的负载影响具有同等地位的2个物理机上的部分虚拟机进行交换，形成变异的可行解
+		public void applyConstraints_origin(int []adjustPosition) {
+			//根据计算出的待调整的物理机的位置，对物理机进行操作
+			
+			//收集虚拟机，用于找出重复的
+			Vector<Integer>repeat_vm=new Vector<Integer>();
+	        //返回映射表的values视图
+			Collection<Vector<Integer>>sets=this.deployMap.values();
+	        for(Vector<Integer> elems:sets){
+	        	for(Integer ele:elems){
+	        		repeat_vm.add(ele);
+	        	}
+	        }
+	        
+	        //根据repeat_vm中重复放置的虚拟机，将所重复的虚拟机，对应的物理机上的标志位重置为0，并从部署表中删除
+	        //找出repeat_vm中重复的虚拟机的下标和虚拟机重复的次数
+	        //前提：同一个虚拟机部署在2个或者多个不同的物理机上，删除次数由【重复次数-1】来决定
+	        Collections.sort(repeat_vm);
+	        int []array=convertVectorToArray(repeat_vm);
+	        
+	        //找出元素中重复元素及其个数
+	        HashMap<Integer,Integer>map_index_count=computeTimesOfRepeatVm(array);
+	        
+	        //将重复部署的物理机对应的标志位置为0，由于上一步的数组中并没有重复元素，tackleRepeatVirtualMachine并没有执行
+	        for(Map.Entry<Integer,Integer> entry:map_index_count.entrySet()){
+	        	Integer key_vm_index=entry.getKey();
+	        	Integer value_repeat_count=entry.getValue();
+	        	//将重复虚拟机上对应的物理机上的标志位置为0，同时将物理机上的虚拟机进行清空
+	        	tackleRepeatVirtualMachine(key_vm_index,value_repeat_count-1);
+	        }
+	        
+			//收集虚拟机，用于找出没有重复的
+			Set<Integer>not_repeat_vm=new HashSet<Integer>();
+			sets=this.deployMap.values();
+	        for(Vector<Integer> elems:sets){
+	        	for(Integer newele:elems){
+	        		not_repeat_vm.add(newele);
+	        	}
+	        }
+	        
+	        //根据虚拟机个数，not_repeat_vm,找出所有没有部署的虚拟机
+	        //这里的没有部署的虚拟机来源有2种: 1】原本就没有部署上去的; 2】是在上一步代码中，因关闭相应物理机而导致没有部署上去的
+	        //这里将上面2种情况统一起来处理,就是上面代码
+	        
+	        //未部署虚拟机的数量
+	        int sizeofvm=this.virtualMachine.length;
+	        int diffsize=sizeofvm-not_repeat_vm.size();
+	        //存放未部署虚拟机的下标
+	        int []not_deploy_vm=new int[diffsize];
+	        int cnt=0;
+	        //取出没有部署的虚拟机，放到未部署列表中去
+	        for(int currindex=0;currindex<sizeofvm;currindex++){
+	        	if(!not_repeat_vm.contains(currindex))
+	        		not_deploy_vm[cnt++]=currindex;
+	        }
+	        
+	        for(int key_vm:not_deploy_vm){
+	        	//使用最佳适应算法进行再次选择
+	        	int key_pm=getBestFitIndex_modify(key_vm,this.virtualMachine[key_vm], this.physicalMachine);
+	        	this.vm_map_pm_index[key_vm]=key_pm;
+	        	
+	        	Vector<Integer>value_vector=this.deployMap.get(key_pm);
+	        	if(value_vector==null){
+	        		value_vector=new Vector<Integer>();
+	        	}
+	        	value_vector.add(key_vm);
+	        	this.deployMap.put(key_pm, value_vector);
+	        }
+	        
+	        //更新适应度值
+	        this.fitness=getLoadDegree();
+	        if(this.fitness>this.localFitness)
+	        	this.localFitness=this.fitness;
+		}
+		
+		/**【创新点】，如何实现更好的负载均衡，需要想清楚交换终止的条件
+		 * 这里无论使用哪一种编码，都是没有问题的，只是实现的难度问题
+		 * 直接对虚拟机上的物理机进行处理【使用第二种编码方式】,VmArray[index]=pmIndex
+		 * 【实现】:对1对甚至多对的虚拟机交换物理机的位置，满足资源的部署需求，同时使得物理机系统的负载不均衡度得以降低
+		 * 【1】对物理机的负载也进行逆序排序，同时对每一台物理机上所有虚拟机的负载进行逆序排序，【这里涉及到如何对虚拟机，物理机的负载进行定义】
+		 * 【2】将最高负载的物理机上最高负载的虚拟机与最低负载的物理机上的最低负载的虚拟机进行交换，若能够进行交换，并且使得负载不均衡度减小，对物理机上的资源进行更新
+		 * 每次交换后，重新计算负载，重新排序【有待商榷】
+		 * 
+		 * 
+		 * 负载的定义：
+		 *   4维资源的加权形式
+		 */
+		@SuppressWarnings("unused")
+		public void applyConstraints_new(Particle particle){
+			
+			//这一部分内容封装到一个函数中，方便进行循环调用
+			int []maxmin_array=new int[2];  //存放最大负载和最小负载的物理机的下标
+			HashMap<Integer,Vector<Integer>> sortResult=getSortResult(particle,maxmin_array);
+			Vector<Integer>min_load_vector=sortResult.get(maxmin_array[0]); //最小负载物理机上虚拟机 【已排序】
+			Vector<Integer>max_load_vector=sortResult.get(maxmin_array[1]); //最大负载物理机山的虚拟机【已排序】
+
+			/****************交换处理**********************/
+			//取出最大负载的物理机上的最大负载的虚拟机
+			VirtualMachine maxloadVmInMaxLoadPm=particle.getVirtualMachine()[max_load_vector.lastElement()];
+			//取出最小负载的物理机上的最小负载的虚拟机
+			VirtualMachine minloadVmInMinLoadPm=particle.getVirtualMachine()[min_load_vector.lastElement()];
+			
+			/*****************能否放置***************************/
+			//物理机上的剩余资源+取出的虚拟机进行PK
+			//假设去掉最大负载的物理机上的最大负载的虚拟机的剩余资源
+			PhysicalMachine assume_remain_resourse_maxLoadPm=PhysicalMachine.add(
+					particle.getPhysicalMachine()[maxmin_array[0]],maxloadVmInMaxLoadPm);
+			
+			//假设去掉最xiao负载的物理机上的最xiao负载的虚拟机的剩余资源
+			PhysicalMachine assume_remain_resourse_minLoadPm=PhysicalMachine.add(
+					particle.getPhysicalMachine()[maxmin_array[1]],minloadVmInMinLoadPm);
+			
+			double [] diffArray_1=PhysicalMachine.pm2Array(
+					PhysicalMachine.sub(assume_remain_resourse_maxLoadPm,minloadVmInMinLoadPm));
+			
+			double [] diffArray_2=PhysicalMachine.pm2Array(
+					PhysicalMachine.sub(assume_remain_resourse_minLoadPm,maxloadVmInMaxLoadPm));
+			
+			if(Utils.canDeployByArray(diffArray_1) && Utils.canDeployByArray(diffArray_2) ){  //可以放置
+				//重新计算放置后的负载不均衡度
+				
+				if(0>0){ //若负载不均衡度值更小,则得到一种新的部署方案
+					
+					
+					
+				}
+				
+			}
+		}
+		
+		/**
+		 * 获取按照负载进行排序了物理机虚拟机映射表
+		 * @param particle 当前粒子
+		 * @param store 存放 最大负载和最小负载的虚拟机编号
+		 * @return
+		 */
+		public  HashMap<Integer,Vector<Integer>>  getSortResult(Particle particle,int []store){
+			 //获取物理机和物理机上每一台虚拟机的负载
+			 //对负载进行逆序排序，直接对HashMap进行处理
+			 //由于是均匀数据，权重暂且定wei0.25
+			 HashMap<Integer,Vector<Integer>>myDeployMap=particle.getDeployMap(); //当前的部署表
+			 
+			 double [] pm_load_array=new double[myDeployMap.size()]; //遍历部署表，获取每台物理机的负载
+			 for(Map.Entry<Integer, Vector<Integer>>entry:myDeployMap.entrySet()){
+				 Integer key=entry.getKey();
+				 double pm_load=PhysicalMachine.getPmLoad(particle.getPhysicalMachine()[key]);
+				 pm_load_array[key]=pm_load;
+			 }
+			 
+			 int []sort_array=getOriginPmIndexAfterSort(pm_load_array); //对物理机的负载进行排序，返回物理机的原始下标
+			 
+			 //存放对负载进行排序了的物理机，虚拟机映射表
+			HashMap<Integer,Vector<Integer>>result=new HashMap<Integer,Vector<Integer>>();
+			
+			for(int lee:sort_array){ //遍历对负载进行排序处理的物理机集合
+				Integer key=lee;
+				Vector<Integer> value=myDeployMap.get(key); //获取物理机上部署的所有虚拟机
+				//对物理机上部署的虚拟机按照负载进行排序
+				Vector<Integer>sort_value=getOriginVmIndexAfterSort(value,particle.getVirtualMachine());
+				result.put(key, sort_value);
+			}
+			
+			store[0]=sort_array[0];
+			store[1]=sort_array[1];
+			
+			return result;
+		}
+		
+		/**
+		 * 获取排序前元素在数组中的下标
+		 * 得到排序前物理机的下标，就可以得到的计算物理机的负载
+		 */
+		public static int []getOriginPmIndexAfterSort(double []array){
+			int []result=new int [array.length];
+			HashMap<Double,Integer>map=new HashMap<Double,Integer>(array.length);
+			for(int index=0;index<array.length;index++)
+				map.put(array[index], index);  //存放元素值和元素的下标
+			
+			Arrays.sort(array);
+			printDoubleArray(array);
+			
+			int cnt=0;
+			for(int index=0;index<array.length;index++){
+				result[cnt++]=map.get(array[index]);  //存放物理机排序前的下标
+			}
+			return result;
+		}
+		
+		/**
+		 * 获取负载进行排序的虚拟机的下标
+		 */
+		public static  Vector<Integer> getOriginVmIndexAfterSort(Vector<Integer>vector,VirtualMachine [] vms){
+			Vector<Integer>result=new Vector<Integer>(vector.size());
+			
+			double [] vm_load_array=new double[vector.size()]; 
+			
+			HashMap<Double,Integer>map=new HashMap<Double,Integer>(vector.size());
+			for(int index=0;index<vector.size();index++){
+				VirtualMachine vm=vms[vector.elementAt(index)];
+				double vm_load=VirtualMachine.getVmLoad(vm);
+				vm_load_array[index]=vm_load;
+				map.put(vm_load, index);  //存放元素值和元素的下标
+			}
+			
+			Arrays.sort(vm_load_array);
+			
+			for(int index=0;index<vector.size();index++){
+				result.add(map.get(vector.elementAt(index)));  //存放物理机排序前的下标
+			}
+			return result;
+		}  
+		
+		public static void printDoubleArray(double[]array){
+			for(double lee:array)
+				System.out.print(lee+" ");
+		}
+		
+		/**
+		 * 
+		 * --------------------------------------------------------------------  
+		 * ----------------------初次部署时,物理机都不是活动的--------------------------------------
+		 * --------------------------------------------------------------------
+		 */
+		
+		//在无法放置时，不进行资源更新
+		public int getRoundRobinIndex_new(VirtualMachine vm,PhysicalMachine []pm){
+			int size;
+			int index=-1;  //表示找不到
+			size=pm.length;
+			//无法满足性能需求
+			while(!utils.canDeployDirectly(pm[this.roundrobinIndex], vm)){
+	               this.roundrobinIndex=(this.roundrobinIndex+1)%size;
+			}
+
+			index=this.roundrobinIndex;
+			//移动下标
+			this.roundrobinIndex=(this.roundrobinIndex+1)%size;
+			return index;
+		}
+		
+		/**
+         * ----------------------最佳适应算子--------------------------------------
+		 */
+		public int getBestFitIndex(int index_vm,VirtualMachine vm,PhysicalMachine []pm){
+			int size,index;
+			int result_index=-1;  //表示找不到
+			size=pm.length;
+			//预先进行计算
+			this.pm_normalized=getNormalized_Pm();
+			//标志值，为寻找最小的距离匹配值，做比较使用
+			double maxDistance=1;
+			for(index=0;index<size;index++){
+				//满足资源需求
+				if(utils.canDeployDirectly(pm[index], vm)){
+					//计算匹配距离，并与上次最好值进行比较
+					double currDistance=BestFit.getMatchDistance(this.pm_normalized[index],this.vm_normalized[index_vm]);
+					if(currDistance<maxDistance){
+						maxDistance=currDistance; //更新最大值
+						result_index=index; //记录最优匹配下的物理机的下标
+					}
+				}
+			}
+			//修改物理机的剩余资源量
+			if(result_index!=-1){
+				double []array=utils.getDiffArray(pm[result_index], vm);
+			    pm[result_index]=new PhysicalMachine(array);
+			}
+			
+			return result_index;
+		}
+		
+		/**
+		 * --------------------------------------------------------------------
+		 * ----------------------当不是初次部署时，需要考虑物理机是否为活动的----------------
+		 * --------------------------------------------------------------------
+		 */
+		
+		/**
+         * ----------------------非首次部署的首次适应算子----------------------------
+		 */
+		public int getFirstFitIndex_modify(VirtualMachine vm,PhysicalMachine []pm){
+			//首次部署中，不用考虑物理机是否为活动的物理机
+			int size,index;
+			size=pm.length;
+			for(index=0;index<size;index++){
+				//保证物理机是活动的
+				if(this.position[index]==1){
+					if(utils.canDeployDirectly(pm[index], vm)){
+						//修改物理机的剩余资源量
+					    double []array=utils.getDiffArray(pm[index], vm);
+					    pm[index]=new PhysicalMachine(array);
+					    break;
+				}
+			}
+	    }
+			//活动物理机无法满足需求，开辟新的物理机
+			if(index==size-1){
+				for(index=0;index<size;index++){
+					//开辟新的物理机
+					if(this.position[index]==0){
+						if(utils.canDeployDirectly(pm[index], vm)){
+							//若可以部署，修改为活动物理机
+							this.position[index]=1;
+							//修改物理机的剩余资源量
+						    double []array=utils.getDiffArray(pm[index], vm);
+						    pm[index]=new PhysicalMachine(array);
+						    break;
+					}
+				}
+		    }
+		 }
+			return index;
+		}
+		
+		/**
+         * ----------------------非首次部署的随机适应算子----------------------------
+		 */
+		public int getRandomFitIndex_modify(VirtualMachine vm,PhysicalMachine []pm){
+			//首次部署中，不用考虑物理机是否为活动的物理机
+			int size,index;
+			size=pm.length;
+			int pmIndex=-1;  //找不到时，返回-1；
+			size=pm.length;
+			//产生于物理机列表等长的不重复的随机数组
+			int []randomArray=createNoRepeatNumber(size);
+			
+			for(index=0;index<randomArray.length;index++){
+				pmIndex=randomArray[index];
+				if(this.position[index]==1){ //有所部署
+				if(utils.canDeployDirectly(pm[pmIndex], vm)){
+					//修改物理机的剩余资源量
+					double []array=utils.getDiffArray(pm[pmIndex], vm);
+					pm[pmIndex]=new PhysicalMachine(array);
+					 break;
+				}
+			  }
+			}
+			//活动物理机无法满足需求，开辟新的物理机
+			if(index==size-1){
+				for(index=0;index<size;index++){
+					//使用第一个空的物理机进行部署，这里可以使用bestFit进行改进【使用性能最为匹配的物理机进行部署】
+					if(this.position[index]==0){
+						if(utils.canDeployDirectly(pm[index], vm)){
+							//若可以部署，修改为活动物理机
+							this.position[index]=1;
+							//修改物理机的剩余资源量
+						    double []array=utils.getDiffArray(pm[index], vm);
+						    pm[index]=new PhysicalMachine(array);
+						    break;
+					}
+				}
+		    }
+		 }
+			return index;
+		}
+		
+		/**
+         * ----------------------非首次部署的最佳适应算子----------------------------
+		 */
+		public int getBestFitIndex_modify(int vmIndex,VirtualMachine vm,PhysicalMachine []pm){
+			int key=-1;
+		    key=getBestFitIndex_new_helper(vmIndex,vm,this.physicalMachine);
+		    if(key==-1){//bestFit无法满足需求，使用轮询进行替代,效果可能并不好【不可行解修复机制代码，代码鲁棒性】
+		    	key=getRoundRobinIndex_modify(vm,this.physicalMachine);
+		    }
+			return key;
+		}
+		
+		/**
+         * ----------------------非首次部署的轮询适应算子----------------------------
+		 */
+		public int getRoundRobinIndex_modify(VirtualMachine vm,PhysicalMachine []pm){
+			//首次部署中，不用考虑物理机是否为活动的物理机
+			int index,size,key,count=0;
+			size=pm.length;
+			
+			//解决放置问题
+			key=getRoundRobinIndex_new(vm,this.physicalMachine);
+			
+			//解决物理机是否为活动的问题
+			while(this.position[key]==0){ //物理机没有使用过，继续轮询
+				 key=getRoundRobinIndex_new(vm,this.physicalMachine);
+				 count++;  //计数器
+			 }
+			 
+			//轮询完所有物理机，表明物理机不符合需求
+			if(count==size){
+				for(index=0;index<size;index++){
+					//开辟新的物理机
+					if(this.position[index]==0){
+						if(utils.canDeployDirectly(pm[index], vm)){
+							//若可以部署，修改为活动物理机
+							this.position[index]=1;
+							//修改物理机的剩余资源量
+						    double []array=utils.getDiffArray(pm[index], vm);
+						    pm[index]=new PhysicalMachine(array);
+						    key=index;
+						    break;
+					}
+				}
+		    }
+		 }
+			else{
+				//找到为活动的，进行部署
+				double []array=utils.getDiffArray(pm[key], vm);
+				pm[key]=new PhysicalMachine(array);
+			}
+			return key;
+		}
+		
+		 /*最佳适应算子的辅助函数*/
+		public int getBestFitIndex_new_helper(int index_vm,VirtualMachine vm,PhysicalMachine []pm){
+			int size,index;
+			int result_index=-1;  //表示找不到
+			size=pm.length;
+			//预先进行计算
+			this.pm_normalized=getNormalized_Pm();
+			//标志值，为寻找最小的距离匹配值，做比较使用
+			double maxDistance=1;
+			for(index=0;index<size;index++){
+				//满足资源需求
+				if(utils.canDeployDirectly(pm[index], vm)){
+					//计算匹配距离，并与上次最好值进行比较
+					double currDistance=BestFit.getMatchDistance(this.pm_normalized[index],this.vm_normalized[index_vm]);
+					if(currDistance<maxDistance){
+						maxDistance=currDistance; //更新最大值
+						result_index=index; //记录最优匹配下的物理机的下标
+					}
+				}
+			}
+			//修改物理机的剩余资源量
+			if(result_index!=-1 && this.position[result_index]==1){
+				double []array=utils.getDiffArray(pm[result_index], vm);
+			    pm[result_index]=new PhysicalMachine(array);
+			}
+			
+			return result_index;
+		}
+
+
+		/**
+         * ---------使用物理机的非归一化的资源向量，计算负载不均衡度值，[0,1]-------
+		 */
+		public double getLoadDegree() {
+			// 【1】求出每种资源R的平均资源利用率
+			double sum_usedCpu, sum_usedMemory, sum_usedBandwidth, sum_usedDisk; // 每一类资源的总的剩余量
+			double aveCpu, aveMemory, aveBandwidth, aveDisk; // 每一类资源的平均利用率
+			sum_usedCpu = sum_usedMemory = sum_usedBandwidth = sum_usedDisk = 0.0; // 剩余资源累加计数器
+			int index, size;
+			size = this.origin_pm.length;
+
+			for (index = 0; index < size; index++) {
+				PhysicalMachine origin_resource, current_resource;
+				origin_resource = this.origin_pm[index]; // 取出使用未使用过的物理机的状态
+				// 【Bug_1】
+				current_resource = this.physicalMachine[index]; // 取出使用了的物理机的状态。
+				sum_usedCpu += (origin_resource.getCpu() - current_resource.getCpu())/origin_resource.getCpu();
+				sum_usedMemory += (origin_resource.getMemory() - current_resource.getMemory())/origin_resource.getMemory();
+				sum_usedBandwidth += (origin_resource.getBandwidth() - current_resource.getBandwidth())/origin_resource.getBandwidth();
+				sum_usedDisk += (origin_resource.getDisk() - current_resource.getDisk())/origin_resource.getDisk();
+			}
+			aveCpu = sum_usedCpu / size; // CPU资源的平均利用率
+			aveMemory = sum_usedMemory / size;// 内存的平均利用率
+			aveBandwidth = sum_usedBandwidth / size;// 带宽资源的平均利用率
+			aveDisk = sum_usedDisk / size;// 硬盘资源的平均利用率
+
+			// 【2】再次遍历,求出负载不均衡度
+			double per_usedCpu, per_usedMemory, per_usedBandwidth, per_usedDisk; // 每一类资源的剩余量
+			per_usedCpu = per_usedMemory = per_usedBandwidth = per_usedDisk = 0;
+			double currsum = 0;
+			for (index = 0; index < size; index++) {
+				PhysicalMachine origin_resource, current_resource;
+				origin_resource = this.origin_pm[index]; // 取出使用未使用过的物理机的状态
+				current_resource = this.physicalMachine[index]; // 取出使用了的物理机的状态。
+				per_usedCpu = (origin_resource.getCpu() - current_resource.getCpu())/origin_resource.getCpu();
+				per_usedMemory = (origin_resource.getMemory() - current_resource.getMemory())/origin_resource.getMemory();
+				per_usedBandwidth = (origin_resource.getBandwidth() - current_resource.getBandwidth())/origin_resource.getBandwidth();
+				per_usedDisk = (origin_resource.getDisk() - current_resource.getDisk())/origin_resource.getDisk();
+				currsum += (Math.abs(per_usedCpu - aveCpu) + Math.abs(per_usedMemory - aveMemory)
+						+ Math.abs(per_usedBandwidth - aveBandwidth) + Math.abs(per_usedDisk - aveDisk));
+			}
+			return currsum / size; // 求出负载不均衡度
+		}
+	
+		
+		public static  HashMap<Integer,Integer> computeTimesOfRepeatVm(int []array){
+	//		printArrays(array);   //发现数组中元素的个数可能=1
+			HashMap<Integer,Integer>map_index_count=new HashMap<Integer,Integer>();
+	        int ele=array[0],count=1;
+	        int index=1,size=array.length;
+	        
+	        //特殊情况，数组中元素个数为1个
+	        if(size==1){
+	        	map_index_count.put(array[0], 1);
+	        	return map_index_count;
+	        }
+	        
+	        while(index<size){
+	        	if(array[index]==ele){
+	        		ele=array[index];
+	        		index++;
+	        		count++;
+	        		//处理最后一个元素
+	        		if(index==size)
+	        			map_index_count.put(ele, count);
+	        	}
+	        	else{
+	        		if(count>=2){
+	        			map_index_count.put(ele, count);
+	        			count=1;
+	        		}
+	        		ele=array[index];
+	        		index++;
+	        	}
+	        }
+	        return  map_index_count;
+		}
+		
+		//可以使用泛型进行重构
+		public int [] convertVectorToArray(Vector<Integer> vector){
+			int []result=new int[vector.size()];
+			int count=0;
+			for(Integer ele:vector)
+				result[count++]=ele;
+			return result;
+		}
+		
+		//根据value中是否含有重复虚拟机，找到对应物理机下标，将物理机下标置为0
+		//找到第一个就跳出，将对应物理机的下标置为0,同时删除映射表中物理机和虚拟机的映射
+		public void tackleRepeatVirtualMachine(int target,int repeat) {
+	        int index=0;
+	        while(index++<repeat){
+	        	//bug this.deployMap=null
+			for(Map.Entry<Integer,Vector<Integer>> entry:this.deployMap.entrySet()){
+	        	Integer key=entry.getKey();
+	        	Vector<Integer>value=entry.getValue();
+	        	if(value.contains(target)){
+	        		//将物理机设置为非活动的
+	        		this.position[key]=0;
+	        		//从部署表中去掉物理机映射关系
+	        		this.deployMap.remove(key);
+	        		//恢复物理机上的资源
+	        		this.physicalMachine[key]=this.origin_pm.clone()[key];
+	        		break;
+	        	}
+	        }
+		}
+	 }
+	
+		public static int []createNoRepeatNumber(int number){
+			 int values[] = new int[number];   
+		        int temp1,temp2,temp3;   
+		        Random random = new Random();   
+		        
+		        for(int i = 0;i < values.length;i++){
+		            values[i] = i;
+		        }
+		        
+		        //随机交换values.length次   
+		        for(int i = 0;i < values.length;i++){   
+		            temp1 = Math.abs(random.nextInt()) % (values.length); //随机产生一个位置   
+		            temp2 = Math.abs(random.nextInt()) % (values.length); //随机产生另一个位置   
+		            
+		            if(temp1 != temp2){
+		                temp3 = values[temp1];   
+		                values[temp1] = values[temp2];   
+		                values[temp2] = temp3;
+		            } 
+		        }   
+			return values;
+		}
+		
+		/**
+		 * 物理机性能的归一化
+		 * @param physicalMachine  物理机
+		 * @return  归一化的物理机性能
+		 */
+		public static  PhysicalMachine [] getNormalized_Pm(){
+			// 获取物理主机列表中各物理主机性能参数的最大值与最小值
+			double[][] arrayA = PhysicalMachine.findMaxMin(physicalMachine);
+
+			int size_pm, index;
+			size_pm = physicalMachine.length;
+			
+			PhysicalMachine [] result_Pm=new PhysicalMachine [size_pm];
+
+			// 进行归一化处理，将处理前和处理后的结果放在一个映射表中，方便记录原始数据和变化后的数据
+			// 主机性能归一化
+			for (index = 0; index < size_pm; index++) {
+				PhysicalMachine ele = physicalMachine[index];
+				double normalizedCPU =(arrayA[0][0] - arrayA[1][0])==0?1: (ele.getCpu() - arrayA[1][0]) / (arrayA[0][0] - arrayA[1][0]);
+				double normalizedMEM = (arrayA[0][1] - arrayA[1][1])==0?1:(ele.getMemory() - arrayA[1][1]) / (arrayA[0][1] - arrayA[1][1]);
+				double normalizedBandwidth = (arrayA[0][2] - arrayA[1][2])==0?1:(ele.getBandwidth() - arrayA[1][2]) / (arrayA[0][2] - arrayA[1][2]);
+				double normalizedDisksize = (arrayA[0][3] - arrayA[1][3])==0?1:(ele.getDisk() - arrayA[1][3]) / (arrayA[0][3] - arrayA[1][3]);
+				result_Pm[index] = new PhysicalMachine(normalizedCPU, normalizedMEM, normalizedBandwidth,
+						normalizedDisksize);
+			}
+			return result_Pm;
+		  }
+		
+		/**
+		 * 虚拟机性能的归一化
+		 * @param physicalMachine  虚拟机
+		 * @return  归一化的虚拟机性能
+		 */
+		  public static  VirtualMachine [] getNormalized_Vm(){
+				// 获取物理主机列表中各虚拟机性能参数的最大值与最小值
+				double[][] arrayB = VirtualMachine.findMaxMin(virtualMachine);
+
+				int size_vm, index;
+				size_vm =virtualMachine.length;
+				
+				VirtualMachine [] result_Pm=new VirtualMachine [size_vm];
+
+				// 进行归一化处理，将处理前和处理后的结果放在一个映射表中，方便记录原始数据和变化后的数据
+				// 虚拟机性能归一化
+				for (index = 0; index < size_vm; index++) {
+					VirtualMachine ele =virtualMachine[index];
+					double normalizedCPU =(arrayB[0][0] - arrayB[1][0])==0?1: (ele.getCpu() - arrayB[1][0]) / (arrayB[0][0] - arrayB[1][0]);
+					double normalizedMEM = (arrayB[0][1] - arrayB[1][1])==0?1:(ele.getMemory() - arrayB[1][1]) / (arrayB[0][1] - arrayB[1][1]);
+					double normalizedBandwidth = (arrayB[0][2] - arrayB[1][2])==0?1:(ele.getBandwidth() - arrayB[1][2]) / (arrayB[0][2] - arrayB[1][2]);
+					double normalizedDisksize = (arrayB[0][3] - arrayB[1][3])==0?1:(ele.getDisk() - arrayB[1][3]) / (arrayB[0][3] - arrayB[1][3]);
+					result_Pm[index] = new VirtualMachine(normalizedCPU, normalizedMEM, normalizedBandwidth,
+							normalizedDisksize);
+				}
+				return result_Pm;
+		}
+			/**-------------------将整型数组写入指定文件中---------------------------------*/
+		public void wirterIntArrayIntoFile(int []array,String file){
+			String content="";
+			for(int lee:array)
+				content+=lee+" ";
+			content+="\n";
+			 BufferedWriter out = null;     
+		        try {     
+		            out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file, true)));     
+		            out.write(content);     
+		        } catch (Exception e) {     
+		            e.printStackTrace();     
+		        } finally {     
+		            try {     
+		                if(out != null){  
+		                    out.close();     
+		                }  
+		            } catch (IOException e) {     
+		                e.printStackTrace();     
+		            }     
+		        }     
+			
+		}
+		
+		/**
+         * ----------------------访问map----------------------------
+		 */
+		public void visitMap(HashMap<Integer,Vector<Integer>>map){
+			for(Map.Entry<Integer,Vector<Integer>>iter:map.entrySet()){
+				System.out.print("key="+iter.getKey()+"  value=");
+				System.out.println(iter.getValue());
+			}
+		}
+		
+		public static void visitMap_1(HashMap<Integer,Integer>map){
+			for(Map.Entry<Integer,Integer>iter:map.entrySet()){
+				System.out.print("key="+iter.getKey()+"  value=");
+				System.out.println(iter.getValue());
+			}
+		}
+		
+		
+		//统计重复虚拟机出现次数
+		public void printArrays(int []array){
+			for(int lee:array)
+				System.out.print(lee+" ");
+			System.out.println();
+		}
+	
+		/** Copy position[] to positionCopy[] */
+		public void copyPosition(int positionCopy[]) {
+			for (int i = 0; i < position.length; i++)
+				positionCopy[i] = position[i];
+		}
+	
+		/** Copy position[] to bestPosition[] */
+		public void copyPosition2Best() {
+			for (int i = 0; i < position.length; i++)
+				bestPosition[i] = position[i];
+		}
+		
+		public double getlocalFitness() {
+			return localFitness;
+		}
+
+		public void setlocalFitness(double localFitness) {
+			this.localFitness = localFitness;
+		}
+
+		public int getNumOfPm() {
+			return NumOfPm;
+		}
+
+		public void setNumOfPm(int numOfPm) {
+			NumOfPm = numOfPm;
+		}
+
+		public int[] getBestPosition() {
+			return bestPosition;
+		}
+	
+		public int getDimension() {
+			return position.length;
+		}
+	
+		public double getFitness() {
+			return fitness;
+		}
+	
+		public int[] getPosition() {
+			return position;
+		}
+	
+		public int[] getVelocity() {
+			return velocity;
+		}
+	
+	
+		public void setBestPosition(int[] bestPosition) {
+			this.bestPosition = bestPosition;
+		}
+	
+		/**
+		 * Set fitness and best fitness accordingly.
+		 * If it's the best fitness so far, copy data to bestFitness_LoadDegree[]
+		 * @param fitness : New fitness value
+		 * @param maximize : Are we maximizing or minimizing fitness function?
+		 */
+		public void setFitness(double fitness, boolean maximize) {
+			this.fitness = fitness;
+			if ((maximize && (fitness > localFitness)) // Maximize and bigger? => store data
+					|| (!maximize && (fitness < localFitness)) // Minimize and smaller? => store data too
+					|| Double.isNaN(localFitness)) {
+				copyPosition2Best();
+				localFitness = fitness;
+			}
+		}
+	
+		public PhysicalMachine[] getPhysicalMachine() {
+			return physicalMachine;
+		}
+	
+		public void setPhysicalMachine(PhysicalMachine[] physicalMachine) {
+			this.physicalMachine = physicalMachine;
+		}
+	
+		public VirtualMachine[] getVirtualMachine() {
+			return virtualMachine;
+		}
+
+		public void setVirtualMachine(VirtualMachine[] virtualMachine) {
+			this.virtualMachine = virtualMachine;
+		}
+
+		public void setPosition(int[] position) {
+			this.position = position;
+		}
+	
+		public void setVelocity(int[] velocity) {
+			this.velocity = velocity;
+		}
+	
+		public HashMap<Integer, Vector<Integer>> getDeployMap() {
+			return deployMap;
+		}
+	
+		public void setDeployMap(HashMap<Integer, Vector<Integer>> deployMap) {
+			this.deployMap = deployMap;
+		}
+	
+		public int[] getBestVelocity() {
+			return bestvelocity;
+		}
+	
+		public void setBestVelocity(int[] bestvelocity) {
+			this.bestvelocity = bestvelocity;
+		}
+		
+		public int[] getVm_map_pm_index() {
+			return vm_map_pm_index;
+		}
+
+		public void setVm_map_pm_index(int[] vm_map_pm_index) {
+			this.vm_map_pm_index = vm_map_pm_index;
+		}
+		
+		public int getUsedOfPm() {
+			return usedOfPm;
+		}
+
+		public void setUsedOfPm(int usedOfPm) {
+			this.usedOfPm = usedOfPm;
+		}
+
+		public static void printArray(int []array){
+			System.out.println();
+			int index,size;
+			size=array.length;
+			for(index=0;index<size;index++){
+				if((index+1)%10==0)
+					System.out.print(array[index]+"\n");
+				else
+					System.out.print(array[index]+" ");
+				
+			}
+		}
+		
+		public static void printMatrix(int [][]array){
+			System.out.println();
+			for(int index1=0;index1<array.length;index1++){
+				for(int index2=0;index2<array[index1].length;index2++)
+					System.out.print(array[index1][index2]+" ");
+				System.out.println();
+			}
+			
+		}
+		
+		public static void main(String []args) throws OptionalDataException, ClassNotFoundException, IOException{
+	
+			//测试记录数组中重复记录的算子
+	//		int []array={0,1,1,2,2,2,4,4,4,4};
+	//		HashMap<Integer,Integer>map_index_count=Particle.computeTimesOfRepeatVm(array);
+	//		Particle.visitMap_1(map_index_count);
+	//		
+	//		//测试随机化数组的效果
+	//		int []arrays=Particle.createNoRepeatNumber(10);
+	//		utils.printIntArray(arrays);
+			
+//		   int []test=Particle.createNoRepeatNumber_1(100);
+		
+//		   int num=1200;
+//		   int particleIndex;
+//		   Scanner input=new Scanner(System.in);
+//		   while((particleIndex=input.nextInt())!=0){
+//			   System.out.println(selectInterval(num,particleIndex));
+//			   int []array_2=selectChoice(1200,particleIndex);  //分段制造随机性
+//			   Particle.printArray(array_2);
+//		   }
+			
+			double []array={1,3,2,4,6,8,5,7};
+			Particle.printArray(getOriginPmIndexAfterSort(array));
+		}
+}

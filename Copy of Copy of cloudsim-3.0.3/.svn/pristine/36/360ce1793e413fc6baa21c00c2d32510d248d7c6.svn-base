@@ -1,0 +1,36 @@
+package org.cloudbus.cloudsim.hust.contrast_test;
+
+import org.cloudbus.cloudsim.hust.ant.ACO;
+import org.cloudbus.cloudsim.hust.base.PhysicalMachine;
+import org.cloudbus.cloudsim.hust.base.VirtualMachine;
+
+public class ACOFit {
+	
+	ACO aco;
+	
+	public ACOFit(PhysicalMachine [] pmArray,VirtualMachine []vmArray){
+		//这里需要进行参数调优
+		int antnum =2;  //对蚁群算法的运行效率影响非常大，太大时间消耗太大
+		int gen = 100;
+		float alpha = 1.0f;
+		float beta = 5.0f;
+		float rho = 0.5f;
+		
+		
+		
+		this.aco = new ACO(pmArray, vmArray, antnum, gen, alpha, beta, rho);
+
+	}
+	
+	public void acoFit(){
+		long startTime = System.currentTimeMillis();    //获取开始时间
+		
+		this.aco.init();
+		this.aco.solve();
+		
+		long endTime = System.currentTimeMillis();    //获取结束时间
+		
+		System.out.println("程序运行时间：" + (endTime - startTime) + "ms");    //输出程序运行时间
+	}
+
+}

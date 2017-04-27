@@ -1,0 +1,142 @@
+package org.cloudbus.cloudsim.policy.VmToHost;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import org.cloudbus.cloudsim.Host;
+import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.VmAllocationPolicy;
+import org.cloudbus.cloudsim.hust.aco.Utils;
+
+public class VmAllocationPolicyRandom extends VmAllocationPolicy {
+	private Map<String, Integer> vmToHost;
+	private Map<Integer,ArrayList<Integer>> vmsInHost;
+	private List<Vm> vmList;
+
+	public VmAllocationPolicyRandom(List<? extends Host> list) {
+		super(list);
+	}
+
+	@Override
+	public boolean allocateHostForVm(Vm vm) {
+		return false;
+	}
+
+	@Override
+	public boolean allocateHostForVm(Vm vm, Host host) {
+		return false;
+	}
+
+	/**
+	 * 算法的主要调用逻辑以及结果的获取
+	 */
+	@Override
+	public List<Map<String, Object>> optimizeAllocation(List<? extends Vm> vmList) {
+		List<Vm> vms=(List<Vm>) vmList;
+		this.vmList=vms;
+		int count=0;
+		vmToHost=new HashMap<String, Integer>();
+		vmsInHost=new HashMap<Integer, ArrayList<Integer>>();
+		for (Vm vm :vms) {
+			int[] randomIndex = Utils.getRandomSequence(getHostList().size());
+			boolean flag=false;
+			for (int i = 0; i < randomIndex.length; i++) {
+				Host host=getHostList().get(randomIndex[i]);
+				if(Utils.isSuitable(vm,host)){
+					host.vmCreate(vm);
+					Utils.updateVmResource(vm);
+					vmToHost.put(vm.getUid(), host.getId());
+					if(!vmsInHost.containsKey(host.getId())){
+						ArrayList<Integer> list=new ArrayList<Integer>();
+						list.add(vm.getId());
+						vmsInHost.put(host.getId(), list);
+					}else{
+						vmsInHost.get(host.getId()).add(vm.getId());
+					}
+					flag=true;
+					break;//找到合适主机
+				}
+			}
+			if(flag){
+				count++;
+			}else{
+				break;//不能全部放置
+			}
+		}
+		if(count!=vms.size()){//资源还原
+			Iterator<Entry<String,Integer>> iter=vmToHost.entrySet().iterator();
+			while(iter.hasNext()){
+				Entry<String,Integer> entry=iter.next();
+				Host host=getHostById(entry.getValue());
+				Vm vm=getVmByUid(entry.getKey());
+				host.vmDestroy(vm);
+				Utils.resetVmResource(vm);
+			}
+			return null;
+		}
+			Object map=vmToHost;
+			List<Map<String, Object>> list=new ArrayList<Map<String,Object>>();
+			list.add((Map<String, Object>)map);
+			
+//			Iterator<Entry<Integer, ArrayList<Integer>>> itor=vmsInHost.entrySet().iterator();
+//			while(itor.hasNext()){
+//				Entry<Integer, ArrayList<Integer>> entry=itor.next();
+//				System.out.print(entry.getKey()+":size="+entry.getValue().size()+"   ");
+//				for(Integer i:entry.getValue())
+//				  System.out.print(i+"  ");
+//				System.out.println();
+//			}
+			
+			return list;
+			
+		
+	}
+	
+	private Host getHostById(Integer id){
+		for(Host host:getHostList()){
+			if(host.getId()==id)
+				return host;
+		}
+		return null;
+	}
+	
+	private Vm getVmByUid(String uid){
+		for(Vm vm:vmList){
+			if(vm.getUid().equals(uid))
+				return vm;
+		}
+		return null;
+	}
+
+	@Override
+	public void deallocateHostForVm(Vm vm) {
+		
+	}
+
+	@Override
+	public Host getHost(Vm vm) {
+		int id=vmToHost.get(vm.getUid());
+		for(Host host:getHostList()){
+			if(host.getId()==id)
+				return host;
+		}
+		return null;
+	}
+
+	@Override
+	public Host getHost(int vmId, int userId) {
+		String Uid=userId + "-" + vmId;
+		int id=vmToHost.get(Uid);
+		for(Host host:getHostList()){
+			if(host.getId()==id)
+				return host;
+		}
+		return null;
+	}
+	
+
+}
