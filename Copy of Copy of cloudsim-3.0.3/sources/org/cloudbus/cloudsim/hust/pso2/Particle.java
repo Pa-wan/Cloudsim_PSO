@@ -12,20 +12,20 @@ import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
 import org.cloudbus.cloudsim.policy.utils.ExtHelper;
 
 public class Particle {
-	private Map<String,ArrayList<Host>> allowed;//物理机候选表
-	private double banlanceDegree;//总体不均衡度
-	private int bestLoad;//最佳负载区间物理机数量
-	public double bestfitness; //粒子本身的最优解
-//	private Map<String,Integer> vmTohost;//每个粒子每次循环输出一个方案
-	
-	private double util[][];//利用率矩阵
-	private double outerStd;//外部方差和
-	private double innerStd;//内部方差和
-	private Map<Integer,Long> storageMap;//物理机固有的存储，Host类中不保存该值
-	private Map<Integer,Host> hostById;
-	private Map<String,Vm> vmByUid;
-	private int t=0;
-	
+	private Map<String, ArrayList<Host>> allowed;// 物理机候选表
+	private double banlanceDegree;// 总体不均衡度
+	private int bestLoad;// 最佳负载区间物理机数量
+	public double bestfitness; // 粒子本身的最优解
+	// private Map<String,Integer> vmTohost;//每个粒子每次循环输出一个方案
+
+	private double util[][];// 利用率矩阵
+	private double outerStd;// 外部方差和
+	private double innerStd;// 内部方差和
+	private Map<Integer, Long> storageMap;// 物理机固有的存储，Host类中不保存该值
+	private Map<Integer, Host> hostById;
+	private Map<String, Vm> vmByUid;
+	private int t = 0;
+
 	private int[] pos;// 粒子的位置，数组的维度表示虚拟机的个数
 	private int[] v;
 	private double fitness;
@@ -37,7 +37,7 @@ public class Particle {
 	private double c1;
 	private double c2;
 	private static Random rnd;
-	private Map<String,Integer> vmTohost;// 每个粒子每次迭代产生的放置方案
+	private Map<String, Integer> vmTohost;// 每个粒子每次迭代产生的放置方案
 
 	int size;// 单个虚拟机可以放置的主机数量
 	private List<Host> fitList;//
@@ -47,10 +47,10 @@ public class Particle {
 	private double utilAvg[];// 单个物理机平均利用率向量
 	public static int runtimes;
 	private int cnt;
-	
-	public Particle(List<Vm> vms,List<Host> hosts){
-		hostlist=ExtHelper.createHostList(hosts.size()); //创建物理机
-		vmlist = ExtHelper.createVmList(Main.brokerId,vms.size());
+
+	public Particle(List<Vm> vms, List<Host> hosts) {
+		hostlist = ExtHelper.createHostList(hosts.size()); // 创建物理机
+		vmlist = ExtHelper.createVmList(Main.brokerId, vms.size());
 		this.dims = vmlist.size();
 		cnt = 0;
 		pos = new int[dims];
@@ -59,13 +59,13 @@ public class Particle {
 		gbest = new int[dims];
 		fitness = 1;
 		pbest_fitness = Double.MAX_VALUE;
-		vmTohost = new HashMap<String,Integer>();
+		vmTohost = new HashMap<String, Integer>();
 		utilAvg = new double[hostlist.size()];
-		util=new double[hostlist.size()][3];
+		util = new double[hostlist.size()][3];
 	}
-	
-	public void init(){
-		
+
+	public void init() {
+
 		fitList = hostlist;
 		rnd = new Random();
 		for (Vm vm : vmlist) {
@@ -81,26 +81,26 @@ public class Particle {
 				vmTohost.put(vm.getUid(), host.getId());
 				pbest[vm.getId()] = pos[vm.getId()];
 				v[vm.getId()] = rnd.nextInt(fitList.size()) - pos[vm.getId()];
-//				updateResource(vm, host);
+				// updateResource(vm, host);
 			}
 		}
 		calcuMd();
 	}
-	
+
 	/**
 	 * 将vm分配的资源返还到host,为下次循环准备，主要目的在于只分配一次vmList,hostList防止堆溢出
 	 */
-	private void reset(){
-		banlanceDegree=0;
-		bestLoad=0;
-		outerStd=0;
-		innerStd=0;
-		
+	private void reset() {
+		banlanceDegree = 0;
+		bestLoad = 0;
+		outerStd = 0;
+		innerStd = 0;
+
 		vmTohost.clear();
-		for(Host host:hostlist){
+		for (Host host : hostlist) {
 			host.vmDestroyAll();
 		}
-		for(Vm vm:vmlist){
+		for (Vm vm : vmlist) {
 			vm.setCurrentAllocatedBw(0);
 			vm.setCurrentAllocatedMips(null);
 			vm.setCurrentAllocatedRam(0);
@@ -111,20 +111,20 @@ public class Particle {
 	/**
 	 * 产生问题的可行解，并计算该解的度量指标
 	 */
-	public void run(){
+	public void run() {
 		reset();
 		updatePos();
 		calcuMd();
 	}
-	
+
 	private void updateResource(Vm vm, Host host) {
-		host.vmCreate(vm);//更新资源，CurrentAllocatedMips,CurrentAllocatedSize
+		host.vmCreate(vm);// 更新资源，CurrentAllocatedMips,CurrentAllocatedSize
 		vm.setCurrentAllocatedSize(vm.getSize());
-		List<Double> list=new ArrayList<Double>();
+		List<Double> list = new ArrayList<Double>();
 		list.add(vm.getCurrentRequestedTotalMips());
 		vm.setCurrentAllocatedMips(list);
 	}
-	
+
 	/**
 	 * 求标准差
 	 * 
@@ -144,27 +144,32 @@ public class Particle {
 		}
 		return Math.sqrt(dVar / m);
 	}
-		
-		
+
 	/**
 	 * 计算总体均衡程度
 	 */
-	private void calcuMd(){
-		double sumCpu=0,sumMem=0,sumBw=0;
-		double load=0;
+	private void calcuMd() {
+		double load = 0;
 		// 在对物理机进行均衡度计算时才更新每个物理机的资源状态
 		for (Host host : hostlist) {
-				for (Vm vm : host.getVmList())
-					updateResource(vm, host);
-//			VMPlacement.updateHost(host);// 根据主机中vmlist编号更新主机资源
-			util[host.getId()][0]=(host.getTotalMips()-host.getAvailableMips())/host.getTotalMips();
-			util[host.getId()][1]=host.getRamProvisioner().getUsedRam()/(host.getRam()+0.0);
-			util[host.getId()][2]=host.getBwProvisioner().getUsedBw()/(host.getBw()+0.0);
-			sumCpu+=util[host.getId()][0];
-			sumMem+=util[host.getId()][1];
-			sumBw+=util[host.getId()][2];
-			load=Math.sqrt(sumCpu*sumCpu+sumMem*sumMem+sumBw*sumBw);
-			utilAvg[host.getId()] =load;
+			double temp=0;
+			for (Vm vm : host.getVmList())
+				updateResource(vm, host);
+			// VMPlacement.updateHost(host);// 根据主机中vmlist编号更新主机资源
+			util[host.getId()][0] = (host.getTotalMips() - host
+					.getAvailableMips()) / host.getTotalMips();
+			util[host.getId()][1] = host.getRamProvisioner().getUsedRam()
+					/ (host.getRam() + 0.0);
+			util[host.getId()][2] = host.getBwProvisioner().getUsedBw()
+					/ (host.getBw() + 0.0);
+			for(int i=0;i<3;i++){
+				temp+=Math.pow(util[host.getId()][i], 2);
+			}
+//			load = Math.sqrt(util[host.getId()][0] * util[host.getId()][0]
+//					+ util[host.getId()][1] * util[host.getId()][1]
+//					+ util[host.getId()][2] * util[host.getId()][2]);
+			load=Math.sqrt(temp);
+			utilAvg[host.getId()] = load;
 		}
 		fitness = StandardDiviation(utilAvg);
 		if (fitness < pbest_fitness) {
@@ -173,14 +178,14 @@ public class Particle {
 			}
 			pbest_fitness = fitness;
 		}
-//		reset();// 每个粒子评估结束之后还原主机资源，以确保下一个粒子能正确计算负载
+		// reset();// 每个粒子评估结束之后还原主机资源，以确保下一个粒子能正确计算负载
 
 	}
-	
+
 	/**
 	 * 在每次循环结束时，先调用reset方法，后调用updatePos方法
 	 */
-	private void updatePos() {//更新位置和速度
+	private void updatePos() {// 更新位置和速度
 		// 线性减少w，正态函数动态调整c1，c2
 		w = 0.9 - 0.5 / 100 * cnt;
 
@@ -200,7 +205,7 @@ public class Particle {
 			pos[vm.getId()] = pos[vm.getId()] + v[vm.getId()];
 			fitList.get(pos[vm.getId()]).getVmList().add(vm);// 第i个vm放入第pos[i]个host
 			vmTohost.put(vm.getUid(), fitList.get(pos[vm.getId()]).getId());
-			updateResource(vm, fitList.get(pos[vm.getId()]));
+//			updateResource(vm, fitList.get(pos[vm.getId()]));
 		}
 		cnt++;
 	}
@@ -216,7 +221,7 @@ public class Particle {
 			}
 		}
 	}
-	
+
 	public double getFitness() {
 		return fitness;
 	}
@@ -233,11 +238,11 @@ public class Particle {
 		this.pos = pos;
 	}
 
-	public Map<String,Integer> getVmTohost() {
+	public Map<String, Integer> getVmTohost() {
 		return vmTohost;
 	}
 
-	public void setVmTohost(Map<String,Integer> vmTohost) {
+	public void setVmTohost(Map<String, Integer> vmTohost) {
 		this.vmTohost = vmTohost;
 	}
 
@@ -249,8 +254,8 @@ public class Particle {
 		this.bestLoad = bestLoad;
 	}
 
-	public void setC(double c1,double c2){
-		this.c1=c1;
-		this.c2=c2;
+	public void setC(double c1, double c2) {
+		this.c1 = c1;
+		this.c2 = c2;
 	}
 }

@@ -85,7 +85,7 @@ public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 			return null;
 		}else{
 			//全部部署完成，记录虚拟机部署日志
-			String fileName="G:/VmPlacedLog.txt";
+			String fileName="D:/VmPlacedLog.txt";
 			File file=new File(fileName);
 			if(!file.exists())
 				try {

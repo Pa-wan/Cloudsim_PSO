@@ -1,11 +1,8 @@
 package org.cloudbus.cloudsim.hust.pso2;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 
@@ -19,11 +16,11 @@ public class PSO {
 	private List<Host> hostlist;//物理机列表
 	public static double[] gbest;//粒子全局最优位置
 	public static int MAX_GEN; // 运行代数
-	private Map<String,ArrayList<Host>> allowed;//可以满足该虚拟机的物理机候选表
+//	private Map<String,ArrayList<Host>> allowed;//可以满足该虚拟机的物理机候选表
 	private Map<Integer,Host> hostById;
 	private Map<String,Vm> vmByUid;
 	private Solution bestSolution;
-	private double bestLoad;
+//	private double bestLoad;
 	
 	private double global_best;// 全局最优适应度值
 	private double global_worst;
@@ -40,7 +37,7 @@ public class PSO {
 		Particle.runtimes = runtimes;
 		global_best = Double.MAX_VALUE;
 		// int index = -1;// 拥有最好位置的粒子编号
-		Imax = 3;
+		Imax = runtimes/num;
 		pars = new Particle[pcount + 1];// 初始化多一个粒子，不参与位置速度的更新，只用作暂存中间数据
 		// 类的静态成员的初始化
 		init();
@@ -78,7 +75,7 @@ public class PSO {
 			// Particle.w=0.9-0.5/runtimes*cnt;
 			// 每个粒子更新位置和适应值
 			for (int j = 0; j < pcount; j++) {
-//				pars[j].setC(c1, c2);
+				pars[j].setC(c1, c2);
 				if (global_best > pars[j].getFitness()) {
 					global_best = pars[j].getFitness();
 					tempbest = pars[j];

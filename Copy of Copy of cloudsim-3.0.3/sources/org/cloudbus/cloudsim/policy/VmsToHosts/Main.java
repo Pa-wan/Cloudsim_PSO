@@ -43,7 +43,7 @@ public class Main {
 			boolean outputToFile = true;  //控制输出到文件，默认设置为false
 			
 			String []policyArray={"","pso","random","firstfit","bestfit","roundrobin",  "combmff","comblff","ant","acopso"};//使用算法名称作为文件名 
-			String policyName=policyArray[1];
+			String policyName=policyArray[2];
 			//根据字符串名获取枚举名称
 			VmAllocationPolicyEnum vmAllocPolicy = VmAllocationPolicyEnum.valueOf(policyName);
 			//根据枚举名称获得接口实例
