@@ -20,9 +20,9 @@ import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
 
 public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 	private Map<String, Integer> vmToHost;
-	private Map<Integer,ArrayList<Integer>> vmsInHost;
+	private Map<Integer, ArrayList<Integer>> vmsInHost;
 	private List<Vm> vmList;
-
+	private double banlanceDegree;// 总体不均衡度
 	public VmAllocationPolicyRandom(List<? extends Host> list) {
 		super(list);
 	}
@@ -41,163 +41,108 @@ public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 	 * 算法的主要调用逻辑以及结果的获取
 	 */
 	@Override
-	public List<Map<String, Object>> optimizeAllocation(List<? extends Vm> vmList) {
-		List<Vm> vms=(List<Vm>) vmList;
-		this.vmList=vms;
-		int count=0;
-		vmToHost=new HashMap<String, Integer>();
-		vmsInHost=new HashMap<Integer, ArrayList<Integer>>();
-		for (Vm vm :vms) {
-			int[] randomIndex = Utils.getRandomSequence(getHostList().size());
-			boolean flag=false;
-			for (int i = 0; i < randomIndex.length; i++) {
-				Host host=getHostList().get(randomIndex[i]);
-				if(Utils.isSuitable(vm,host)){
-					host.vmCreate(vm);
-					Utils.updateVmResource(vm);
-					vmToHost.put(vm.getUid(), host.getId());
-					if(!vmsInHost.containsKey(host.getId())){
-						ArrayList<Integer> list=new ArrayList<Integer>();
-						list.add(vm.getId());
-						vmsInHost.put(host.getId(), list);
-					}else{
-						vmsInHost.get(host.getId()).add(vm.getId());
-					}
-					flag=true;
-					break;//找到合适主机
+	public List<Map<String, Object>> optimizeAllocation(
+			List<? extends Vm> vmList) {
+		List<Vm> vms = (List<Vm>) vmList;
+		this.vmList = vms;
+		vmToHost = new HashMap<String, Integer>();
+		vmsInHost = new HashMap<Integer, ArrayList<Integer>>();
+		// 匹配可以放置该vm的物理机
+		for (Vm vm : vmList) {
+			ArrayList<Host> fithostlist = new ArrayList<Host>();
+			for (Host host : getHostList()) {
+				if (Utils.isSuitable(vm, host)) {
+					fithostlist.add(host);// 将符合条件的物理主机放入数组中
 				}
 			}
-			if(flag){
-				count++;
-			}else{
-				break;//不能全部放置
+			if (fithostlist.size() == 0)
+				System.out.println(vm.getId() + "号虚拟机无合适物理机可以放置");
+			else {
+				// 从满足条件的主机中随机获取一个物理机编号
+				int index = (int) (Math.random() * fithostlist.size());
+				Host valueHost = fithostlist.get(index);
+				valueHost.vmCreate(vm);
+				Utils.updateVmResource(vm);
+				vmToHost.put(vm.getUid(), valueHost.getId());
+				if (!vmsInHost.containsKey(valueHost.getId())) {
+					ArrayList<Integer> list = new ArrayList<Integer>();
+					list.add(vm.getId());
+					vmsInHost.put(valueHost.getId(), list);
+				} else {
+					vmsInHost.get(valueHost.getId()).add(vm.getId());
+				}
 			}
 		}
-		if(count!=vms.size()){//资源还原
-			Iterator<Entry<String,Integer>> iter=vmToHost.entrySet().iterator();
-			while(iter.hasNext()){
-				Entry<String,Integer> entry=iter.next();
-				Host host=getHostById(entry.getValue());
-				Vm vm=getVmByUid(entry.getKey());
-				host.vmDestroy(vm);
-				Utils.resetVmResource(vm);
-			}
-			return null;
-		}else{
-			//全部部署完成，记录虚拟机部署日志
-			String fileName="D:/VmPlacedLog.txt";
-			File file=new File(fileName);
-			if(!file.exists())
-				try {
-					file.createNewFile();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			try {
-				BufferedWriter writer=new BufferedWriter(new FileWriter(fileName,true));
-				Iterator<Entry<String,Integer>> iter=vmToHost.entrySet().iterator();
-				while(iter.hasNext()){
-					Entry<String,Integer> entry=iter.next();
-					String str="Vm #"+entry.getKey()+" has been created in Host #"+entry.getValue()+"\r\n";
-					writer.write(str);
-				}
-				writer.flush();
-				writer.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		Object map = vmToHost;
+		List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+		list.add((Map<String, Object>) map);
+		calcuMd();
+		Iterator<Entry<Integer, ArrayList<Integer>>> itor=vmsInHost.entrySet().iterator();
+		while(itor.hasNext()){
+			Entry<Integer, ArrayList<Integer>> entry=itor.next();
+			System.out.print(entry.getKey()+":size="+entry.getValue().size()+"   ");
+			for(Integer i:entry.getValue())
+			  System.out.print(i+"  ");
+			System.out.println();
 		}
-		Object map=vmToHost;
-		List<Map<String, Object>> list=new ArrayList<Map<String,Object>>();
-		list.add((Map<String, Object>)map);
-		//calcuMd();
 		return list;
 	}
-	
-	private void calcuMd(){
-		Map<Integer,Double> std=new HashMap<Integer, Double>();
-		double avg[]=new double[ConstantConfig.resNum];
-		double sumCpu=0,sumMem=0,sumBw=0,sumStorage=0;
-		double outerStd=0;double innerStd=0;
-		List<Host> hostList=getHostList();
-		Map<Integer, double[]> util=new HashMap<Integer, double[]>();
-		Map<Integer, Double> utilAvg=new HashMap<Integer, Double>();
-		int bestLoad=0;
-		double banlanceDegree=0;
-		
-		for(Host host:hostList){
-			util.put(host.getId(), new double[ConstantConfig.resNum]);
+
+	private void calcuMd() {
+		double util[][]=new double[getHostList().size()][3];// 利用率矩阵
+		double[] utilAvg = new double[getHostList().size()];
+		double load = 0;
+		// 在对物理机进行均衡度计算时才更新每个物理机的资源状态
+		for (Host host : getHostList()) {
 			double temp=0;
-			util.get(host.getId())[0]=(host.getTotalMips()-host.getAvailableMips())/host.getTotalMips();
-			util.get(host.getId())[1]=host.getRamProvisioner().getUsedRam()/(host.getRam()+0.0);
-			util.get(host.getId())[2]=host.getBwProvisioner().getUsedBw()/(host.getBw()+0.0);
-			util.get(host.getId())[3]=(Main.storageMap.get(host.getId())-host.getStorage())/(Main.storageMap.get(host.getId())+0.0);
-			
-			sumCpu+=util.get(host.getId())[0];
-			sumMem+=util.get(host.getId())[1];
-			sumBw+=util.get(host.getId())[2];
-			sumStorage+=util.get(host.getId())[3];
-			
-//			boolean flag=false;
-//			for(int i=0;i<4;i++){
-//				if(!(util.get(host.getId())[i]<=0.9&&util.get(host.getId())[i]>=0.1)){
-//					flag=true;
-//					break;
-//				}
-//			}
-//			if(!flag){
-//				bestLoad++;
-//			}
-			
-			double tempAvg=(util.get(host.getId())[0]+util.get(host.getId())[1]+util.get(host.getId())[2]+util.get(host.getId())[3])/4;
-			utilAvg.put(host.getId(), tempAvg);
-			for(int i=0;i<4;i++){
-				temp+=Math.pow(util.get(host.getId())[i]-utilAvg.get(host.getId()), 2);
+			util[host.getId()][0] = (host.getTotalMips() - host
+					.getAvailableMips()) / host.getTotalMips();
+			util[host.getId()][1] = host.getRamProvisioner().getUsedRam()
+					/ (host.getRam() + 0.0);
+			util[host.getId()][2] = host.getBwProvisioner().getUsedBw()
+					/ (host.getBw() + 0.0);
+			for(int i=0;i<3;i++){
+				temp+=Math.pow(util[host.getId()][i], 2);
 			}
-			std.put(host.getId(), Math.sqrt(temp/4));
-			innerStd+=std.get(host.getId());
+//			load = Math.sqrt(util[host.getId()][0] * util[host.getId()][0]
+//					+ util[host.getId()][1] * util[host.getId()][1]
+//					+ util[host.getId()][2] * util[host.getId()][2]);
+			load=Math.sqrt(temp);
+			utilAvg[host.getId()] = load;
 		}
-		
-		avg[0]=sumCpu/(hostList.size());
-		avg[1]=sumMem/(hostList.size());
-		avg[2]=sumBw/(hostList.size());
-		avg[3]=sumStorage/(hostList.size());
-		for(Host host:hostList){
-			boolean flag=false;
-			for(int i=0;i<4;i++){
-				if(!(Math.abs(util.get(host.getId())[i]-avg[i])<=0.1)){
-					flag=true;
-					break;
-				}
-			}
-			if(!flag){
-				bestLoad++;
-			}
-			
-			double temp=0;
-			for(int i=0;i<4;i++){
-				temp+=Math.pow(util.get(host.getId())[i]-avg[i], 2);
-				//temp+=Math.abs(util.get(host.getId())[i]-avg[i]);
-			}
-			outerStd+=Math.sqrt(temp);
-			//outerStd+=temp;
-		}
-		banlanceDegree=(innerStd+outerStd)/hostList.size();//改进评价指标，引入内部资源方差
-		//banlanceDegree=outerStd/hostList.size();
-		System.out.println("banlanceDegree="+banlanceDegree);
+		banlanceDegree = StandardDiviation(utilAvg);
+		System.out.println("banlanceDegree=" + banlanceDegree);
 	}
-	
-	private Host getHostById(Integer id){
-		for(Host host:getHostList()){
-			if(host.getId()==id)
+	/**
+	 * 求标准差
+	 * 
+	 * @param x
+	 * @return
+	 */
+	private static double StandardDiviation(double[] x) {
+		int m = x.length;
+		double sum = 0;
+		for (int i = 0; i < m; i++) {// 求和
+			sum += x[i];
+		}
+		double dAve = sum / m;// 求平均值
+		double dVar = 0;
+		for (int i = 0; i < m; i++) {// 求方差
+			dVar += (x[i] - dAve) * (x[i] - dAve);
+		}
+		return Math.sqrt(dVar / m);
+	}
+	private Host getHostById(Integer id) {
+		for (Host host : getHostList()) {
+			if (host.getId() == id)
 				return host;
 		}
 		return null;
 	}
-	
-	private Vm getVmByUid(String uid){
-		for(Vm vm:vmList){
-			if(vm.getUid().equals(uid))
+
+	private Vm getVmByUid(String uid) {
+		for (Vm vm : vmList) {
+			if (vm.getUid().equals(uid))
 				return vm;
 		}
 		return null;
@@ -205,14 +150,14 @@ public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 
 	@Override
 	public void deallocateHostForVm(Vm vm) {
-		
+
 	}
 
 	@Override
 	public Host getHost(Vm vm) {
-		int id=vmToHost.get(vm.getUid());
-		for(Host host:getHostList()){
-			if(host.getId()==id)
+		int id = vmToHost.get(vm.getUid());
+		for (Host host : getHostList()) {
+			if (host.getId() == id)
 				return host;
 		}
 		return null;
@@ -220,14 +165,13 @@ public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 
 	@Override
 	public Host getHost(int vmId, int userId) {
-		String Uid=userId + "-" + vmId;
-		int id=vmToHost.get(Uid);
-		for(Host host:getHostList()){
-			if(host.getId()==id)
+		String Uid = userId + "-" + vmId;
+		int id = vmToHost.get(Uid);
+		for (Host host : getHostList()) {
+			if (host.getId() == id)
 				return host;
 		}
 		return null;
 	}
-	
 
 }

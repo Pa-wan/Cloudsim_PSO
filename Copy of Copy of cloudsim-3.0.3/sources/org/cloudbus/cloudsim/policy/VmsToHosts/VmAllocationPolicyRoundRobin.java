@@ -91,11 +91,6 @@ public class VmAllocationPolicyRoundRobin extends VmAllocationPolicy implements 
                 lastAllocatedHost = currentIndex; //保存本次访问物理机，作为下一个物理机轮序的根据
                 return true;
             }
-            //上一次没有部署成功，选择下一个物理机，计数器+1
-//            if(currentIndex == hostSize - 1) //跳过尾部
-//                currentIndex = 0;
-//            else  //不是尾部，直接递增
-//                currentIndex++; 
             currentIndex=(currentIndex+1)%hostSize; //在没有部署成功时，继续进行轮询
         }//轮询一周没有发现目标主机，部署失败
         

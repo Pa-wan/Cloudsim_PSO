@@ -28,8 +28,8 @@ public class Main {
 	public static Map<Integer,Long> storageMap;//物理机固有的存储，Host类中不保存该值
 	public static int userId=5;
 	
-	//public static void main(String[] args) {
-	public static void init(){
+	public static void init(String policyName) {
+//	public static void init(){
 		Log.printLine("Starting VmsToHosts...");
 
 		try {
@@ -42,8 +42,8 @@ public class Main {
 			boolean enableOutput = true;
 			boolean outputToFile = true;  //控制输出到文件，默认设置为false
 			
-			String []policyArray={"","pso","random","firstfit","bestfit","roundrobin",  "combmff","comblff","ant","acopso"};//使用算法名称作为文件名 
-			String policyName=policyArray[2];
+//			String []policyArray={"","pso","random","greedy","roundrobin" ,"firstfit","combmff","comblff","ant","acopso"};//使用算法名称作为文件名 
+//			String policyName=policyArray[2];
 			//根据字符串名获取枚举名称
 			VmAllocationPolicyEnum vmAllocPolicy = VmAllocationPolicyEnum.valueOf(policyName);
 			//根据枚举名称获得接口实例
@@ -124,9 +124,9 @@ public class Main {
 				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyFirstFit(hostList); }
 			};
 			break;
-		case bestfit:
+		case greedy:
 			vmAllocationFac = new VmAllocationPolicyFactory() {
-				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyBestFit(hostList); }
+				public VmAllocationPolicy create(List<? extends Host> hostList) { return new VmAllocationPolicyGreedy(hostList); }
 			};
 			break;
 		case roundrobin:

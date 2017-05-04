@@ -18,5 +18,9 @@
 	<classpathentry kind="lib" path="jars/swt-grouplayout.jar"/>
 	<classpathentry kind="lib" path="jars/swt.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="lib/swing-layout-1.0.3.jar"/>
+	<classpathentry kind="lib" path="lib/AbsoluteLayout.jar"/>
+	<classpathentry kind="lib" path="lib/quaqua.jar"/>
+	<classpathentry kind="lib" path="lib/beansbinding-1.2.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
