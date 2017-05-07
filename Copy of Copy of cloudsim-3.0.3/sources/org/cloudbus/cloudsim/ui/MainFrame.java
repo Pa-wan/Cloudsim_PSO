@@ -8,13 +8,9 @@ package org.cloudbus.cloudsim.ui;
 
 import java.awt.Dimension;
 import java.awt.Toolkit;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.util.Enumeration;
-
-import javax.swing.AbstractButton;
-import javax.swing.UIManager;
-import javax.swing.UnsupportedLookAndFeelException;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 
 import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
 import org.cloudbus.cloudsim.policy.utils.ExtendedConstants;
@@ -23,7 +19,7 @@ import org.cloudbus.cloudsim.policy.utils.ExtendedConstants;
  * 
  * @author __USER__
  */
-public class MainFrame extends javax.swing.JFrame {
+public class MainFrame extends JFrame {
 
 	/**
 	 * 
@@ -48,35 +44,36 @@ public class MainFrame extends javax.swing.JFrame {
 	// <editor-fold defaultstate="collapsed" desc="Generated Code">
 	private void initComponents() {
 
-		sel_policy = new javax.swing.ButtonGroup();
-		buttonGroup1 = new javax.swing.ButtonGroup();
-		Init_Form = new javax.swing.JPanel();
-		Vm_Num = new javax.swing.JLabel();
-		Host_Num = new javax.swing.JLabel();
-		Host_Number = new javax.swing.JTextField();
-		Vm_Number = new javax.swing.JTextField();
-		InitState = new javax.swing.JButton();
-		err_show = new javax.swing.JLabel();
-		RB_PSO = new javax.swing.JRadioButton();
-		RB_Random = new javax.swing.JRadioButton();
-		RB_Greedy = new javax.swing.JRadioButton();
-		RB_Roundrobin = new javax.swing.JRadioButton();
-		jScrollPane1 = new javax.swing.JScrollPane();
-		jTable1 = new javax.swing.JTable();
-		Start_Migrate = new javax.swing.JButton();
+		sel_policy = new ButtonGroup();
+		Init_Form = new JPanel();
+		Vm_Num = new JLabel();
+		Host_Num = new JLabel();
+		Host_Number = new JTextField();
+		Vm_Number = new JTextField();
+		InitState = new JButton();
+		err_show = new JLabel();
+		RB_PSO = new JRadioButton();
+		RB_Random = new JRadioButton();
+		RB_Greedy = new JRadioButton();
+		RB_Roundrobin = new JRadioButton();
+		jScrollPane1 = new JScrollPane();
+		jScrollPane2 = new JScrollPane();
+		jTable1 = new JTable();
+		jTable2 = new JTable();
+		Start_Migrate = new JButton();
 
-		setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-		setTitle("\u57fa\u4e8e\u8d1f\u8f7d\u5747\u8861\u7684\u865a\u62df\u673a\u52a8\u6001\u8fc1\u79fb\u5c55\u793a");
+		setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+		setTitle("基于负载均衡的云计算资源调度展示");
 		setCursor(new java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR));
 
-		Init_Form.setBorder(javax.swing.BorderFactory
-				.createLineBorder(new java.awt.Color(0, 0, 0)));
+		Init_Form.setBorder(BorderFactory.createLineBorder(new java.awt.Color(
+				0, 0, 0)));
 
-		Vm_Num.setText("\u865a\u62df\u673a\u6570\u76ee");
+		Vm_Num.setText("虚拟机数目");
 
-		Host_Num.setText("\u4e3b\u673a\u6570\u76ee");
+		Host_Num.setText("主机数目");
 
-		InitState.setText("\u5f00\u59cb\u90e8\u7f72");
+		InitState.setText("开始部署");
 		InitState.addMouseListener(new java.awt.event.MouseAdapter() {
 			public void mouseClicked(java.awt.event.MouseEvent evt) {
 				InitStateMouseClicked(evt);
@@ -84,49 +81,37 @@ public class MainFrame extends javax.swing.JFrame {
 		});
 
 		err_show.setForeground(new java.awt.Color(255, 0, 0));
+		err_show.setText("请输入主机和虚拟机数目!");
+		err_show.setVisible(false);
 
-		RB_PSO.setText("\u7c92\u5b50\u7fa4\u7b97\u6cd5");
+		RB_PSO.setText("粒子群算法");
 		RB_PSO.setActionCommand("pso");
 
-		RB_Random.setText("\u968f\u673a\u7b97\u6cd5");
+		RB_Random.setText("随机算法");
 		RB_Random.setActionCommand("random");
 
-		RB_Greedy.setText("\u8d2a\u5fc3\u7b97\u6cd5");
+		RB_Greedy.setText("贪心算法");
 		RB_Greedy.setActionCommand("greedy");
 
-		RB_Roundrobin.setText("\u8f6e\u8be2\u7b97\u6cd5");
+		RB_Roundrobin.setText("轮询算法");
 		RB_Roundrobin.setActionCommand("roundrobin");
 
-//		class RadioButtonListener implements ActionListener {
-//			@Override
-//			public void actionPerformed(ActionEvent arg0) {
-//				policy = sel_policy.getSelection().getActionCommand();
-//			}
-//
-//		}
-//		ActionListener aListener = new RadioButtonListener();
-//		RB_Greedy.addActionListener(aListener);
-//		RB_PSO.addActionListener(aListener);
-//		RB_Random.addActionListener(aListener);
-//		RB_Roundrobin.addActionListener(aListener);
 		sel_policy.add(RB_PSO);
 		sel_policy.add(RB_Greedy);
 		sel_policy.add(RB_Random);
 		sel_policy.add(RB_Roundrobin);
-		javax.swing.GroupLayout Init_FormLayout = new javax.swing.GroupLayout(
-				Init_Form);
+		GroupLayout Init_FormLayout = new GroupLayout(Init_Form);
 		Init_Form.setLayout(Init_FormLayout);
 		Init_FormLayout
 				.setHorizontalGroup(Init_FormLayout
-						.createParallelGroup(
-								javax.swing.GroupLayout.Alignment.LEADING)
+						.createParallelGroup(GroupLayout.Alignment.LEADING)
 						.addGroup(
 								Init_FormLayout
 										.createSequentialGroup()
 										.addGroup(
 												Init_FormLayout
 														.createParallelGroup(
-																javax.swing.GroupLayout.Alignment.LEADING)
+																GroupLayout.Alignment.LEADING)
 														.addGroup(
 																Init_FormLayout
 																		.createSequentialGroup()
@@ -134,7 +119,7 @@ public class MainFrame extends javax.swing.JFrame {
 																		.addGroup(
 																				Init_FormLayout
 																						.createParallelGroup(
-																								javax.swing.GroupLayout.Alignment.LEADING,
+																								GroupLayout.Alignment.LEADING,
 																								false)
 																						.addGroup(
 																								Init_FormLayout
@@ -146,16 +131,16 @@ public class MainFrame extends javax.swing.JFrame {
 																												18)
 																										.addComponent(
 																												Host_Number,
-																												javax.swing.GroupLayout.PREFERRED_SIZE,
+																												GroupLayout.PREFERRED_SIZE,
 																												66,
-																												javax.swing.GroupLayout.PREFERRED_SIZE))
+																												GroupLayout.PREFERRED_SIZE))
 																						.addGroup(
 																								Init_FormLayout
 																										.createSequentialGroup()
 																										.addComponent(
 																												Vm_Num)
 																										.addPreferredGap(
-																												javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+																												LayoutStyle.ComponentPlacement.RELATED)
 																										.addComponent(
 																												Vm_Number))))
 														.addGroup(
@@ -167,7 +152,7 @@ public class MainFrame extends javax.swing.JFrame {
 																		.addGroup(
 																				Init_FormLayout
 																						.createParallelGroup(
-																								javax.swing.GroupLayout.Alignment.LEADING)
+																								GroupLayout.Alignment.LEADING)
 																						.addComponent(
 																								RB_Random)
 																						.addComponent(
@@ -179,20 +164,19 @@ public class MainFrame extends javax.swing.JFrame {
 																						.addComponent(
 																								RB_Roundrobin)))
 														.addGroup(
-																javax.swing.GroupLayout.Alignment.TRAILING,
+																GroupLayout.Alignment.TRAILING,
 																Init_FormLayout
 																		.createSequentialGroup()
 																		.addContainerGap()
 																		.addComponent(
 																				err_show,
-																				javax.swing.GroupLayout.DEFAULT_SIZE,
+																				GroupLayout.DEFAULT_SIZE,
 																				188,
 																				Short.MAX_VALUE)))
 										.addContainerGap()));
 		Init_FormLayout
 				.setVerticalGroup(Init_FormLayout
-						.createParallelGroup(
-								javax.swing.GroupLayout.Alignment.LEADING)
+						.createParallelGroup(GroupLayout.Alignment.LEADING)
 						.addGroup(
 								Init_FormLayout
 										.createSequentialGroup()
@@ -200,74 +184,72 @@ public class MainFrame extends javax.swing.JFrame {
 										.addGroup(
 												Init_FormLayout
 														.createParallelGroup(
-																javax.swing.GroupLayout.Alignment.BASELINE)
+																GroupLayout.Alignment.BASELINE)
 														.addComponent(Host_Num)
 														.addComponent(
 																Host_Number,
-																javax.swing.GroupLayout.PREFERRED_SIZE,
-																javax.swing.GroupLayout.DEFAULT_SIZE,
-																javax.swing.GroupLayout.PREFERRED_SIZE))
+																GroupLayout.PREFERRED_SIZE,
+																GroupLayout.DEFAULT_SIZE,
+																GroupLayout.PREFERRED_SIZE))
 										.addPreferredGap(
-												javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+												LayoutStyle.ComponentPlacement.UNRELATED)
 										.addGroup(
 												Init_FormLayout
 														.createParallelGroup(
-																javax.swing.GroupLayout.Alignment.BASELINE)
+																GroupLayout.Alignment.BASELINE)
 														.addComponent(Vm_Num)
 														.addComponent(
 																Vm_Number,
-																javax.swing.GroupLayout.PREFERRED_SIZE,
-																javax.swing.GroupLayout.DEFAULT_SIZE,
-																javax.swing.GroupLayout.PREFERRED_SIZE))
+																GroupLayout.PREFERRED_SIZE,
+																GroupLayout.DEFAULT_SIZE,
+																GroupLayout.PREFERRED_SIZE))
 										.addGap(36, 36, 36)
 										.addGap(26, 26, 26)
 										.addComponent(RB_PSO)
 										.addPreferredGap(
-												javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+												LayoutStyle.ComponentPlacement.RELATED)
 										.addComponent(RB_Random)
 										.addPreferredGap(
-												javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+												LayoutStyle.ComponentPlacement.RELATED)
 										.addComponent(RB_Greedy)
 										.addPreferredGap(
-												javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+												LayoutStyle.ComponentPlacement.RELATED)
 										.addComponent(RB_Roundrobin)
 										.addGap(48, 48, 48)
 										.addComponent(InitState)
 										.addPreferredGap(
-												javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-										.addComponent(
-												err_show,
-												javax.swing.GroupLayout.PREFERRED_SIZE,
-												23,
-												javax.swing.GroupLayout.PREFERRED_SIZE)
+												LayoutStyle.ComponentPlacement.RELATED)
+										.addComponent(err_show,
+												GroupLayout.PREFERRED_SIZE, 23,
+												GroupLayout.PREFERRED_SIZE)
 										.addContainerGap(81, Short.MAX_VALUE)));
 
-		jTable1.setModel(new javax.swing.table.DefaultTableModel(
-				new Object[][] { { null, null, null, null, null, null },
-						{ null, null, null, null, null, null },
-						{ null, null, null, null, null, null },
-						{ null, null, null, null, null, null } }, new String[] {
-						"主机编号", "虚拟机编号", "CPU", "内存", "带宽", "利用率" }));
+		jTable1.setModel(new DefaultTableModel(
+				new Object[][] { { null, null, null, null, null, null } },
+				new String[] { "主机编号", "虚拟机编号", "CPU", "内存", "带宽", "利用率" }));
 		jScrollPane1.setViewportView(jTable1);
+		jTable2.setModel(new DefaultTableModel(
+				new Object[][] { { null, null, null, null, null, null } },
+				new String[] { "虚拟机编号", "主机编号", "CPU", "内存", "带宽", "利用率" }));
+		jScrollPane2.setViewportView(jTable2);
 
-		Start_Migrate.setText("\u52a8\u6001\u6a21\u62df");
+		Start_Migrate.setText("动态模拟");
 
-		javax.swing.GroupLayout layout = new javax.swing.GroupLayout(
-				getContentPane());
+		GroupLayout layout = new GroupLayout(getContentPane());
 		getContentPane().setLayout(layout);
 		layout.setHorizontalGroup(layout
-				.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+				.createParallelGroup(GroupLayout.Alignment.LEADING)
 				.addGroup(
 						layout.createSequentialGroup()
 								.addComponent(Init_Form,
-										javax.swing.GroupLayout.PREFERRED_SIZE,
-										javax.swing.GroupLayout.DEFAULT_SIZE,
-										javax.swing.GroupLayout.PREFERRED_SIZE)
+										GroupLayout.PREFERRED_SIZE,
+										GroupLayout.DEFAULT_SIZE,
+										GroupLayout.PREFERRED_SIZE)
 								.addPreferredGap(
-										javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+										LayoutStyle.ComponentPlacement.RELATED)
 								.addGroup(
 										layout.createParallelGroup(
-												javax.swing.GroupLayout.Alignment.LEADING)
+												GroupLayout.Alignment.LEADING)
 												.addGroup(
 														layout.createSequentialGroup()
 																.addComponent(
@@ -277,25 +259,41 @@ public class MainFrame extends javax.swing.JFrame {
 																		427))
 												.addGroup(
 														layout.createSequentialGroup()
-																.addComponent(
-																		jScrollPane1,
-																		javax.swing.GroupLayout.DEFAULT_SIZE,
-																		496,
-																		Short.MAX_VALUE)
-																.addContainerGap()))));
+																.addPreferredGap(
+																		javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+																.addGroup(
+																		layout.createParallelGroup(
+																				javax.swing.GroupLayout.Alignment.LEADING)
+																				.addComponent(
+																						jScrollPane2,
+																						javax.swing.GroupLayout.DEFAULT_SIZE,
+																						457,
+																						Short.MAX_VALUE)
+																				.addComponent(
+																						jScrollPane1,
+																						javax.swing.GroupLayout.DEFAULT_SIZE,
+																						457,
+																						Short.MAX_VALUE))))
+								.addContainerGap()));
 		layout.setVerticalGroup(layout
-				.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+				.createParallelGroup(GroupLayout.Alignment.LEADING)
 				.addGroup(
 						layout.createSequentialGroup()
 								.addContainerGap()
 								.addComponent(Start_Migrate)
 								.addPreferredGap(
-										javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-								.addComponent(jScrollPane1,
-										javax.swing.GroupLayout.DEFAULT_SIZE,
-										419, Short.MAX_VALUE))
-				.addComponent(Init_Form, javax.swing.GroupLayout.DEFAULT_SIZE,
-						javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE));
+										LayoutStyle.ComponentPlacement.UNRELATED)
+										.addComponent(jScrollPane1,
+												javax.swing.GroupLayout.PREFERRED_SIZE,
+												179,
+												javax.swing.GroupLayout.PREFERRED_SIZE)
+										.addPreferredGap(
+												javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+										.addComponent(jScrollPane2,
+												javax.swing.GroupLayout.DEFAULT_SIZE,
+												263, Short.MAX_VALUE))
+				.addComponent(Init_Form, GroupLayout.DEFAULT_SIZE,
+						GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE));
 
 		getAccessibleContext().setAccessibleParent(this);
 
@@ -306,20 +304,20 @@ public class MainFrame extends javax.swing.JFrame {
 	private void InitStateMouseClicked(java.awt.event.MouseEvent evt) {
 		int hostnum = 0;
 		int vmnum = 0;
-		String policy=null;
+		String policy = null;
 		try {
 			hostnum = Integer.parseInt(Host_Number.getText());
 			vmnum = Integer.parseInt(Vm_Number.getText());
-			Enumeration<AbstractButton> radioBtns=sel_policy.getElements();
+			Enumeration<AbstractButton> radioBtns = sel_policy.getElements();
 			while (radioBtns.hasMoreElements()) {
-			    AbstractButton btn = radioBtns.nextElement();
-			    if(btn.isSelected()){
-			        policy=btn.getActionCommand();
-			        break;
-			    }
+				AbstractButton btn = radioBtns.nextElement();
+				if (btn.isSelected()) {
+					policy = btn.getActionCommand();
+					break;
+				}
 			}
 		} catch (Exception e) {
-			err_show.setText("请输入主机和虚拟机数目!");
+			err_show.setVisible(true);
 		}
 
 		if (hostnum != 0 && vmnum != 0) {
@@ -327,7 +325,10 @@ public class MainFrame extends javax.swing.JFrame {
 			ExtendedConstants.setHostNum(hostnum);// 物理机数
 			ExtendedConstants.setVmNum(vmnum);// 虚拟机数
 			Main.init(policy);// 算法执行
-//			 System.out.println(policy);
+			jTable2.setModel(new DefaultTableModel(
+					Main.getVmToHost(),
+					new String[] { "虚拟机编号", "主机编号", "CPU", "内存", "带宽", "利用率" }));
+			// System.out.println(policy);
 		}
 	}
 
@@ -339,8 +340,10 @@ public class MainFrame extends javax.swing.JFrame {
 		java.awt.EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
-					UIManager.setLookAndFeel(UIManager
-							.getSystemLookAndFeelClassName());
+//					UIManager.setLookAndFeel(UIManager
+//							.getSystemLookAndFeelClassName());
+					JFrame.setDefaultLookAndFeelDecorated(true);  
+					UIManager.setLookAndFeel("ch.randelshofer.quaqua.QuaquaLookAndFeel");
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -352,22 +355,23 @@ public class MainFrame extends javax.swing.JFrame {
 
 	// GEN-BEGIN:variables
 	// Variables declaration - do not modify
-	private javax.swing.JLabel Host_Num;
-	private javax.swing.JTextField Host_Number;
-	private javax.swing.JButton InitState;
-	private javax.swing.JPanel Init_Form;
-	private javax.swing.JRadioButton RB_Greedy;
-	private javax.swing.JRadioButton RB_PSO;
-	private javax.swing.JRadioButton RB_Random;
-	private javax.swing.JRadioButton RB_Roundrobin;
-	private javax.swing.JButton Start_Migrate;
-	private javax.swing.JLabel Vm_Num;
-	private javax.swing.JTextField Vm_Number;
-	private javax.swing.ButtonGroup buttonGroup1;
-	private javax.swing.JLabel err_show;
-	private javax.swing.JScrollPane jScrollPane1;
-	private javax.swing.JTable jTable1;
-	private javax.swing.ButtonGroup sel_policy;
+	private JLabel Host_Num;
+	private JTextField Host_Number;
+	private JButton InitState;
+	private JPanel Init_Form;
+	private JRadioButton RB_Greedy;
+	private JRadioButton RB_PSO;
+	private JRadioButton RB_Random;
+	private JRadioButton RB_Roundrobin;
+	private JButton Start_Migrate;
+	private JLabel Vm_Num;
+	private JTextField Vm_Number;
+	private JLabel err_show;
+	private JScrollPane jScrollPane1;
+	private JScrollPane jScrollPane2;
+	private JTable jTable1;
+	private JTable jTable2;
+	private ButtonGroup sel_policy;
 	// End of variables declaration//GEN-END:variables
 
 }

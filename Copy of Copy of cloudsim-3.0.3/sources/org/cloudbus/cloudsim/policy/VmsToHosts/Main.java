@@ -28,7 +28,7 @@ public class Main {
 	public static Map<Integer,Long> storageMap;//物理机固有的存储，Host类中不保存该值
 	public static int userId=5;
 	
-	public static void init(String policyName) {
+	public static  void init(String policyName) {
 //	public static void init(){
 		Log.printLine("Starting VmsToHosts...");
 
@@ -85,7 +85,7 @@ public class Main {
 			
 			double start=System.currentTimeMillis();
 			double lastClock=CloudSim.startSimulation();
-//			DynamicProcess dynamicProcess=new DynamicProcess(ExtHelper.vmAllocationPolicy);
+//			DynamicProcess dynamicProcess=new DynamicProcess(ExtHelper.vu mAllocationPolicy);
 //			dynamicProcess.dynamicRun();
 			double end=System.currentTimeMillis();
 			System.out.println("time: "+(end-start)/1000+"s");
@@ -177,7 +177,6 @@ public class Main {
 		for (int i = 0; i < size; i++) {
 			cloudlet = list.get(i);
 			Log.print(indent + cloudlet.getCloudletId() + indent + indent);
-
 			if (cloudlet.getCloudletStatus() == Cloudlet.SUCCESS){
 				Log.print("SUCCESS");
 
@@ -192,4 +191,41 @@ public class Main {
 
 	}
 	
+	public static Object[][] getVmToHost(){
+		Object[][] data=new Object[vmlist.size()+1][];
+		int k=0;
+		for(Vm vm:vmlist){
+			try {
+				Object[] row=new Object[6];
+				row[0]=vm.getId();
+				row[1]=vm.getHost().getId();
+				row[2]=0;
+				row[3]=vm.getCurrentAllocatedRam()/vm.getRam();
+				row[4]=vm.getCurrentAllocatedBw()/vm.getBw();
+				row[5]=0;
+				data[k++]=row;
+			} catch (Exception e) {
+			}
+		}
+		return data;
+	}
+	
+	public static Object[][] getVmsInHost(){
+		Object[][] data=new Object[vmlist.size()+1][];
+		int k=0;
+		for(Vm vm:vmlist){
+			try {
+				Object[] row=new Object[6];
+				row[0]=vm.getId();
+				row[1]=vm.getHost().getId();
+				row[2]=0;
+				row[3]=vm.getCurrentAllocatedRam()/vm.getRam();
+				row[4]=vm.getCurrentAllocatedBw()/vm.getBw();
+				row[5]=0;
+				data[k++]=row;
+			} catch (Exception e) {
+			}
+		}
+		return data;
+	}
 }
