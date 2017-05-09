@@ -29,7 +29,7 @@ public class MainFrame extends JFrame {
 	/** Creates new form MainFrame */
 	public MainFrame() {
 		Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
-		int width = 500;
+		int width = 800;
 		int height = 500;
 		setBounds((d.width - width) / 2, (d.height - height) / 2, width, height);
 		initComponents();
@@ -58,8 +58,14 @@ public class MainFrame extends JFrame {
 		RB_Roundrobin = new JRadioButton();
 		jScrollPane1 = new JScrollPane();
 		jScrollPane2 = new JScrollPane();
+		jScrollPane3 = new JScrollPane();
 		jTable1 = new JTable();
 		jTable2 = new JTable();
+		jTable3 = new JTable();
+		jLabel1 = new JLabel();
+		jLabel2 = new JLabel();
+		jTextField1 = new JTextField();
+		jTextField2 = new JTextField();
 		Start_Migrate = new JButton();
 
 		setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
@@ -74,6 +80,8 @@ public class MainFrame extends JFrame {
 		Host_Num.setText("主机数目");
 
 		InitState.setText("开始部署");
+		jLabel1.setText("第几轮迁移");
+		jLabel2.setText("总共迁移次数");
 		InitState.addMouseListener(new java.awt.event.MouseAdapter() {
 			public void mouseClicked(java.awt.event.MouseEvent evt) {
 				InitStateMouseClicked(evt);
@@ -224,14 +232,19 @@ public class MainFrame extends JFrame {
 												GroupLayout.PREFERRED_SIZE)
 										.addContainerGap(81, Short.MAX_VALUE)));
 
-		jTable1.setModel(new DefaultTableModel(
-				new Object[][] { { null, null, null, null, null, null } },
-				new String[] { "主机编号", "虚拟机编号", "CPU", "内存", "带宽", "利用率" }));
+		jTable1.setModel(new DefaultTableModel(new Object[][] { { null, null,
+				null, null, null, null } }, new String[] { "主机编号", "虚拟机编号",
+				"CPU", "内存", "带宽", "利用率" }));
 		jScrollPane1.setViewportView(jTable1);
-		jTable2.setModel(new DefaultTableModel(
-				new Object[][] { { null, null, null, null, null, null } },
-				new String[] { "虚拟机编号", "主机编号", "CPU", "内存", "带宽", "利用率" }));
+		jTable2.setModel(new DefaultTableModel(new Object[][] { { null, null,
+				null, null, null, null } }, new String[] { "虚拟机编号", "主机编号",
+				"CPU", "内存", "带宽", "利用率" }));
 		jScrollPane2.setViewportView(jTable2);
+
+		jTable3.setModel(new javax.swing.table.DefaultTableModel(
+				new Object[][] { { null, null } }, new String[] { "待迁移虚拟机编号",
+						"目的主机编号" }));
+		jScrollPane3.setViewportView(jTable3);
 
 		Start_Migrate.setText("动态模拟");
 
@@ -254,46 +267,92 @@ public class MainFrame extends JFrame {
 														layout.createSequentialGroup()
 																.addComponent(
 																		Start_Migrate)
-																.addGap(427,
-																		427,
-																		427))
+																.addGap(43, 43,
+																		43)
+																.addComponent(
+																		jLabel1)
+																.addPreferredGap(
+																		LayoutStyle.ComponentPlacement.RELATED)
+																.addComponent(
+																		jTextField1,
+																		GroupLayout.PREFERRED_SIZE,
+																		66,
+																		GroupLayout.PREFERRED_SIZE)
+																.addGap(27, 27,
+																		27)
+																.addComponent(
+																		jLabel2)
+																.addPreferredGap(
+																		LayoutStyle.ComponentPlacement.RELATED)
+																.addComponent(
+																		jTextField2,
+																		GroupLayout.PREFERRED_SIZE,
+																		66,
+																		GroupLayout.PREFERRED_SIZE))
 												.addGroup(
 														layout.createSequentialGroup()
 																.addPreferredGap(
-																		javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+																		LayoutStyle.ComponentPlacement.RELATED)
 																.addGroup(
 																		layout.createParallelGroup(
-																				javax.swing.GroupLayout.Alignment.LEADING)
+																				GroupLayout.Alignment.LEADING)
 																				.addComponent(
 																						jScrollPane2,
-																						javax.swing.GroupLayout.DEFAULT_SIZE,
-																						457,
+																						GroupLayout.DEFAULT_SIZE,
+																						500,
 																						Short.MAX_VALUE)
 																				.addComponent(
 																						jScrollPane1,
-																						javax.swing.GroupLayout.DEFAULT_SIZE,
-																						457,
+																						GroupLayout.DEFAULT_SIZE,
+																						500,
 																						Short.MAX_VALUE))))
+								.addPreferredGap(
+										LayoutStyle.ComponentPlacement.RELATED)
+								.addComponent(jScrollPane3,
+										GroupLayout.PREFERRED_SIZE,
+										200,
+										GroupLayout.PREFERRED_SIZE)
 								.addContainerGap()));
 		layout.setVerticalGroup(layout
 				.createParallelGroup(GroupLayout.Alignment.LEADING)
 				.addGroup(
 						layout.createSequentialGroup()
 								.addContainerGap()
-								.addComponent(Start_Migrate)
+								.addGroup(
+										layout.createParallelGroup(
+												javax.swing.GroupLayout.Alignment.BASELINE)
+												.addComponent(Start_Migrate)
+												.addComponent(
+														jTextField1,
+														javax.swing.GroupLayout.PREFERRED_SIZE,
+														javax.swing.GroupLayout.DEFAULT_SIZE,
+														javax.swing.GroupLayout.PREFERRED_SIZE)
+												.addComponent(jLabel1)
+												.addComponent(
+														jTextField2,
+														javax.swing.GroupLayout.PREFERRED_SIZE,
+														javax.swing.GroupLayout.DEFAULT_SIZE,
+														javax.swing.GroupLayout.PREFERRED_SIZE)
+												.addComponent(jLabel2))
 								.addPreferredGap(
 										LayoutStyle.ComponentPlacement.UNRELATED)
-										.addComponent(jScrollPane1,
-												javax.swing.GroupLayout.PREFERRED_SIZE,
-												179,
-												javax.swing.GroupLayout.PREFERRED_SIZE)
-										.addPreferredGap(
-												javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-										.addComponent(jScrollPane2,
-												javax.swing.GroupLayout.DEFAULT_SIZE,
-												263, Short.MAX_VALUE))
+								.addComponent(jScrollPane1,
+										javax.swing.GroupLayout.PREFERRED_SIZE,
+										179,
+										javax.swing.GroupLayout.PREFERRED_SIZE)
+								.addPreferredGap(
+										javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+								.addComponent(jScrollPane2,
+										javax.swing.GroupLayout.DEFAULT_SIZE,
+										263, Short.MAX_VALUE))
 				.addComponent(Init_Form, GroupLayout.DEFAULT_SIZE,
-						GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE));
+						GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+				.addGroup(
+						layout.createSequentialGroup()
+								.addContainerGap()
+								.addComponent(jScrollPane3,
+										javax.swing.GroupLayout.DEFAULT_SIZE,
+										495, Short.MAX_VALUE)));
 
 		getAccessibleContext().setAccessibleParent(this);
 
@@ -325,8 +384,7 @@ public class MainFrame extends JFrame {
 			ExtendedConstants.setHostNum(hostnum);// 物理机数
 			ExtendedConstants.setVmNum(vmnum);// 虚拟机数
 			Main.init(policy);// 算法执行
-			jTable2.setModel(new DefaultTableModel(
-					Main.getVmToHost(),
+			jTable2.setModel(new DefaultTableModel(Main.getVmToHost(),
 					new String[] { "虚拟机编号", "主机编号", "CPU", "内存", "带宽", "利用率" }));
 			// System.out.println(policy);
 		}
@@ -340,10 +398,11 @@ public class MainFrame extends JFrame {
 		java.awt.EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
-//					UIManager.setLookAndFeel(UIManager
-//							.getSystemLookAndFeelClassName());
-					JFrame.setDefaultLookAndFeelDecorated(true);  
-					UIManager.setLookAndFeel("ch.randelshofer.quaqua.QuaquaLookAndFeel");
+					// UIManager.setLookAndFeel(UIManager
+					// .getSystemLookAndFeelClassName());
+					JFrame.setDefaultLookAndFeelDecorated(true);
+					UIManager
+							.setLookAndFeel("ch.randelshofer.quaqua.QuaquaLookAndFeel");
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -369,9 +428,15 @@ public class MainFrame extends JFrame {
 	private JLabel err_show;
 	private JScrollPane jScrollPane1;
 	private JScrollPane jScrollPane2;
+	private JScrollPane jScrollPane3;
 	private JTable jTable1;
 	private JTable jTable2;
+	private JTable jTable3;
+	private JLabel jLabel1;
+	private JLabel jLabel2;
 	private ButtonGroup sel_policy;
+	private JTextField jTextField1;
+	private JTextField jTextField2;
 	// End of variables declaration//GEN-END:variables
 
 }

@@ -659,4 +659,12 @@ public class Host {
 		this.datacenter = datacenter;
 	}
 
+	public double getLoad(){
+		double load=0;
+		double uCPU=(getTotalMips()-getAvailableMips())/getTotalMips();
+		double uRam=getRamProvisioner().getUsedRam()/(getRam()+0.0);
+		double uBw=getBwProvisioner().getUsedBw()/(getBw()+0.0);
+		load=0.7*uCPU+0.2*uRam+0.1*uBw;
+		return load;
+	}
 }

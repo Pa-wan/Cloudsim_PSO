@@ -51,4 +51,12 @@ public class prediction {
 		calcuLoad = lastCalLoad + a * (Uload - lastCalLoad);
 		return calcuLoad;
 	}
+	
+	public List<Host> getHotList(){
+		return hotList;
+	}
+
+	public void setHotList(List<Host> hotList) {
+		this.hotList = hotList;
+	}
 }

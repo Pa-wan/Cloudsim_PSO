@@ -24,13 +24,12 @@ public class PSO {
 	
 	private double global_best;// 全局最优适应度值
 	private double global_worst;
-	private static int dim;// 维度
 	private static int Imax;// 最差纪录次数阈值
 	private int runtime; //迭代次数
 	
 	public PSO(int num, int runtimes, List<Vm> vmList, List<Host> hostList){
 		this.vmlist = vmList;
-		dim = vmList.size();
+		vmList.size();
 		this.hostlist = hostList;
 		this.pcount = num;
 		this.runtime = runtimes;
