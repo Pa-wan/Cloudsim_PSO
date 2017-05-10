@@ -101,10 +101,7 @@ public class Particle {
 			host.vmDestroyAll();
 		}
 		for (Vm vm : vmlist) {
-			vm.setCurrentAllocatedBw(0);
-			vm.setCurrentAllocatedMips(null);
-			vm.setCurrentAllocatedRam(0);
-			vm.setCurrentAllocatedSize(0);
+			Utils.resetVmResource(vm);
 		}
 	}
 

@@ -81,7 +81,7 @@ public class MainFrame extends JFrame {
 
 		InitState.setText("开始部署");
 		jLabel1.setText("第几轮迁移");
-		jLabel2.setText("总共迁移次数");
+		jLabel2.setText("该抡迁移次数");
 		InitState.addMouseListener(new java.awt.event.MouseAdapter() {
 			public void mouseClicked(java.awt.event.MouseEvent evt) {
 				InitStateMouseClicked(evt);

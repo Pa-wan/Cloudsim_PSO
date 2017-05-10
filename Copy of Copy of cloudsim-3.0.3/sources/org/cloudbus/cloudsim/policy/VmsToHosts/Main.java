@@ -12,6 +12,7 @@ import org.cloudbus.cloudsim.Log;
 import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.VmAllocationPolicy;
 import org.cloudbus.cloudsim.core.CloudSim;
+import org.cloudbus.cloudsim.examples.power.random.RandomHelper;
 
 import org.cloudbus.cloudsim.policy.VmToHost.VmAllocationPolicyRandom;
 import org.cloudbus.cloudsim.policy.utils.ExtHelper;
@@ -79,13 +80,13 @@ public class Main {
 //				vm.setUid(userId++ +"-"+0);
 //			}
 			
-			//cloudletList = RandomHelper.createCloudletList(brokerId,numberOfVms); // creating cloudlets
+//			cloudletList = RandomHelper.createCloudletList(brokerId,numberOfVms); // creating cloudlets
 			broker.submitVmList(vmlist);
-			//broker.submitCloudletList(cloudletList);
+//			broker.submitCloudletList(cloudletList);
 			
 			double start=System.currentTimeMillis();
 			double lastClock=CloudSim.startSimulation();
-//			DynamicProcess dynamicProcess=new DynamicProcess(ExtHelper.vu mAllocationPolicy);
+//			DynamicProcess dynamicProcess=new DynamicProcess(ExtHelper.vmAllocationPolicy);
 //			dynamicProcess.dynamicRun();
 			double end=System.currentTimeMillis();
 			System.out.println("time: "+(end-start)/1000+"s");

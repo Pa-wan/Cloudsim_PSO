@@ -14,6 +14,7 @@ public class prediction {
 	private static List<Host> hostList;
 	private List<Vm> vmList;
 	private static List<Host> hotList;
+	private static List<Host> unHotList;
 	private static double a = 0.6;
 	private static Map<Host, ArrayList<Double>> loadToHost;// 计算得到的预测负载
 
@@ -21,9 +22,10 @@ public class prediction {
 		hostList = new ArrayList<Host>();
 		loadToHost = new HashMap<Host, ArrayList<Double>>();
 		hotList = new ArrayList<Host>();
+		unHotList=new ArrayList<Host>();
 		for (Host host : hostList) {
 			ArrayList<Double> tempLoad = new ArrayList<Double>();
-			double ELoad = host.getLoad() + 0.1;
+			double ELoad = host.getLoad() + 0.1; //预测负载初始值，设定为预测前三周期负载的平均值
 			for (int i = 0; i < 5; i++) {
 				double temp = calcuPreLoad(host, ELoad);
 				tempLoad.add(temp);
@@ -42,6 +44,9 @@ public class prediction {
 			}
 			if (cnt >= 4)
 				hotList.add(entry.getKey());
+			else {
+				unHotList.add(entry.getKey());
+			}
 		}
 	}
 
@@ -52,11 +57,19 @@ public class prediction {
 		return calcuLoad;
 	}
 	
-	public List<Host> getHotList(){
+	public static List<Host> getHotList(){
 		return hotList;
 	}
 
 	public void setHotList(List<Host> hotList) {
 		this.hotList = hotList;
+	}
+	
+	public static List<Host> getunHotList(){
+		return unHotList;
+	}
+	
+	public void setunHotList(List<Host> unHotList){
+		this.unHotList=unHotList;
 	}
 }
