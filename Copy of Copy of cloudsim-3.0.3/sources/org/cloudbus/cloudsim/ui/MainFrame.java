@@ -384,6 +384,8 @@ public class MainFrame extends JFrame {
 			ExtendedConstants.setHostNum(hostnum);// 物理机数
 			ExtendedConstants.setVmNum(vmnum);// 虚拟机数
 			Main.init(policy);// 算法执行
+			jTable1.setModel(new DefaultTableModel(Main.getVmsInHost(),
+					new String[] { "主机编号", "虚拟机编号", "CPU", "内存", "带宽", "利用率" }));
 			jTable2.setModel(new DefaultTableModel(Main.getVmToHost(),
 					new String[] { "虚拟机编号", "主机编号", "CPU", "内存", "带宽", "利用率" }));
 			// System.out.println(policy);

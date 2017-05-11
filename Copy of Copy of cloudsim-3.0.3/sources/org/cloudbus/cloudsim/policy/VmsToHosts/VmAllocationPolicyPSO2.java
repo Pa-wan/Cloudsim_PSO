@@ -60,6 +60,7 @@ public class VmAllocationPolicyPSO2 extends VmAllocationPolicy{
 				vmsInHost.get(host.getId()).add(vm.getId());
 			}
 			host.vmCreate(vm);//更新资源，CurrentAllocatedMips,CurrentAllocatedSize
+			host.getVmList().add(vm);
 			vm.setCurrentAllocatedSize(vm.getSize());
 			List<Double> list=new ArrayList<Double>();
 			list.add(vm.getCurrentRequestedTotalMips());

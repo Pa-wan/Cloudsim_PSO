@@ -62,7 +62,6 @@ public class SelVmMigrating {
 
 	private Host selectHostMigratein(Vm vm) {
 		unHotList = prediction.getunHotList();
-		HashMap<Host, Double> disToHost = new HashMap<>();
 		double tempdistance = Double.MAX_VALUE;
 		for (Host host : unHotList) {
 			if (Utils.isSuitable(vm, host)) {

@@ -62,6 +62,7 @@ public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 				int index = (int) (Math.random() * fithostlist.size());
 				Host valueHost = fithostlist.get(index);
 				valueHost.vmCreate(vm);
+				valueHost.getVmList().add(vm);
 				Utils.updateVmResource(vm);
 				vmToHost.put(vm.getUid(), valueHost.getId());
 				if (!vmsInHost.containsKey(valueHost.getId())) {

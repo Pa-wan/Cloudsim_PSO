@@ -11,15 +11,15 @@ import org.cloudbus.cloudsim.Host;
 import org.cloudbus.cloudsim.Vm;
 
 public class prediction {
-	private static List<Host> hostList;
+//	private static List<Host> hostList;
 	private List<Vm> vmList;
 	private static List<Host> hotList;
 	private static List<Host> unHotList;
 	private static double a = 0.6;
 	private static Map<Host, ArrayList<Double>> loadToHost;// 计算得到的预测负载
 
-	public static void main(String[] args) {
-		hostList = new ArrayList<Host>();
+	public static void predict(List<Host> hostList) {
+//		hostList = new ArrayList<Host>();
 		loadToHost = new HashMap<Host, ArrayList<Double>>();
 		hotList = new ArrayList<Host>();
 		unHotList=new ArrayList<Host>();

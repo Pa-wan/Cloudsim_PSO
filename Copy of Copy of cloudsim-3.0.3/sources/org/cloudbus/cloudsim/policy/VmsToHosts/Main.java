@@ -14,6 +14,7 @@ import org.cloudbus.cloudsim.VmAllocationPolicy;
 import org.cloudbus.cloudsim.core.CloudSim;
 import org.cloudbus.cloudsim.examples.power.random.RandomHelper;
 
+import org.cloudbus.cloudsim.migrate.HostDynamicLoad;
 import org.cloudbus.cloudsim.policy.VmToHost.VmAllocationPolicyRandom;
 import org.cloudbus.cloudsim.policy.utils.ExtHelper;
 import org.cloudbus.cloudsim.policy.utils.ExtendedConstants;
@@ -23,6 +24,7 @@ import org.cloudbus.cloudsim.policy.utils.ExtDatacenterBrocker;
 public class Main {
 	private static List<Cloudlet> cloudletList;
 	private static List<Vm> vmlist;
+	private static List<Host> hostList;
 	public static VmAllocationPolicy  instance;
 	public static int brokerId;
 	public static ExtDatacenterBrocker broker;
@@ -56,7 +58,7 @@ public class Main {
 
 			// 第二步: 创建数据中心
 	        int numberOfHosts=ExtendedConstants.numberOfHosts;
-	        List<Host> hostList = ExtHelper.createHostList(numberOfHosts); //创建物理机
+	        hostList = ExtHelper.createHostList(numberOfHosts); //创建物理机
 	        storageMap=new HashMap<Integer, Long>();
 	        for(Host host:hostList){
 				storageMap.put(host.getId(), host.getStorage());
@@ -88,7 +90,9 @@ public class Main {
 			double lastClock=CloudSim.startSimulation();
 //			DynamicProcess dynamicProcess=new DynamicProcess(ExtHelper.vmAllocationPolicy);
 //			dynamicProcess.dynamicRun();
+			HostDynamicLoad hostDynamicLoad=new HostDynamicLoad(hostList);
 			double end=System.currentTimeMillis();
+			hostDynamicLoad.run();
 			System.out.println("time: "+(end-start)/1000+"s");
 			
 			List<Cloudlet> newList = broker.getCloudletReceivedList();
@@ -211,20 +215,25 @@ public class Main {
 		return data;
 	}
 	
-	public static Object[][] getVmsInHost(){
-		Object[][] data=new Object[vmlist.size()+1][];
-		int k=0;
-		for(Vm vm:vmlist){
-			try {
-				Object[] row=new Object[6];
-				row[0]=vm.getId();
-				row[1]=vm.getHost().getId();
-				row[2]=0;
-				row[3]=vm.getCurrentAllocatedRam()/vm.getRam();
-				row[4]=vm.getCurrentAllocatedBw()/vm.getBw();
-				row[5]=0;
-				data[k++]=row;
-			} catch (Exception e) {
+	public static Object[][] getVmsInHost() {
+		Object[][] data = new Object[vmlist.size() + 1][];
+		DecimalFormat decfmt = new DecimalFormat("##0.000000");   
+		int k = 0;
+		for(Host host:hostList){
+			try{
+				Object[] row = new Object[6];
+				row[0] = host.getId();
+				String temp=null;
+				for(Vm vm:host.getVmList()){
+					temp=vm.getId()+",";
+				}
+				row[1] = temp;
+				row[2] = decfmt.format((host.getTotalMips()-host.getAvailableMips())/host.getTotalMips());
+				row[3] = decfmt.format(host.getRamProvisioner().getUsedRam() / host.getRam());
+				row[4] = decfmt.format(host.getBwProvisioner().getUsedBw() / host.getBw());
+				row[5] = 0;
+				data[k++] = row;
+			}catch (Exception e) {
 			}
 		}
 		return data;
