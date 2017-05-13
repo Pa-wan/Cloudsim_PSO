@@ -23,10 +23,10 @@ public class SelVmMigrating {
 	private double bestDistance;
 	private Host bestHost;
 
-	public SelVmMigrating() {
+	public SelVmMigrating(Map<Vm, ArrayList<Double>> triUtilToVm) {
 		this.hotList = prediction.getHotList();
 		lossToVm = new HashMap<Vm, Double>();
-		loadToVm = new HashMap<Vm, ArrayList<Double>>();
+		loadToVm = triUtilToVm;
 		bestDistance = Double.MAX_VALUE;
 		solution=new HashMap<Vm,Host>();
 		selectVms();
