@@ -12,20 +12,11 @@ import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
 import org.cloudbus.cloudsim.policy.utils.ExtHelper;
 
 public class Particle {
-	private Map<String, ArrayList<Host>> allowed;// 物理机候选表
-	private double banlanceDegree;// 总体不均衡度
 	private int bestLoad;// 最佳负载区间物理机数量
 	public double bestfitness; // 粒子本身的最优解
 	// private Map<String,Integer> vmTohost;//每个粒子每次循环输出一个方案
 
 	private double util[][];// 利用率矩阵
-	private double outerStd;// 外部方差和
-	private double innerStd;// 内部方差和
-	private Map<Integer, Long> storageMap;// 物理机固有的存储，Host类中不保存该值
-	private Map<Integer, Host> hostById;
-	private Map<String, Vm> vmByUid;
-	private int t = 0;
-
 	private int[] pos;// 粒子的位置，数组的维度表示虚拟机的个数
 	private int[] v;
 	private double fitness;
@@ -91,11 +82,7 @@ public class Particle {
 	 * 将vm分配的资源返还到host,为下次循环准备，主要目的在于只分配一次vmList,hostList防止堆溢出
 	 */
 	private void reset() {
-		banlanceDegree = 0;
 		bestLoad = 0;
-		outerStd = 0;
-		innerStd = 0;
-
 		vmTohost.clear();
 		for (Host host : hostlist) {
 			host.vmDestroyAll();

@@ -8,10 +8,12 @@ package org.cloudbus.cloudsim.ui;
 
 import java.awt.Dimension;
 import java.awt.Toolkit;
+import java.awt.event.MouseEvent;
 import java.util.Enumeration;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 
+import org.cloudbus.cloudsim.migrate.StartMigrate;
 import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
 import org.cloudbus.cloudsim.policy.utils.ExtendedConstants;
 
@@ -234,20 +236,27 @@ public class MainFrame extends JFrame {
 
 		jTable1.setModel(new DefaultTableModel(new Object[][] { { null, null,
 				null, null, null, null } }, new String[] { "主机编号", "虚拟机编号",
-				"CPU", "内存", "带宽", "利用率" }));
+				"CPU(%)", "内存(%)", "带宽(%)", "利用率(%)" }));
 		jScrollPane1.setViewportView(jTable1);
 		jTable2.setModel(new DefaultTableModel(new Object[][] { { null, null,
 				null, null, null, null } }, new String[] { "虚拟机编号", "主机编号",
-				"CPU", "内存", "带宽", "利用率" }));
+				"CPU(%)", "内存(%)", "带宽(%)", "利用率(%)" }));
 		jScrollPane2.setViewportView(jTable2);
 
-		jTable3.setModel(new javax.swing.table.DefaultTableModel(
+		jTable3.setModel(new DefaultTableModel(
 				new Object[][] { { null, null } }, new String[] { "待迁移虚拟机编号",
 						"目的主机编号" }));
 		jScrollPane3.setViewportView(jTable3);
 
+		GlobalObject.setjScrollPane(jScrollPane3);
+		GlobalObject.setjTable(jTable3);
 		Start_Migrate.setText("动态模拟");
 
+		Start_Migrate.addMouseListener(new java.awt.event.MouseAdapter() {
+			public void mouseClicked(java.awt.event.MouseEvent evt) {
+				StartMigrateMouseClicked(evt);
+			}
+		});
 		GroupLayout layout = new GroupLayout(getContentPane());
 		getContentPane().setLayout(layout);
 		layout.setHorizontalGroup(layout
@@ -360,7 +369,7 @@ public class MainFrame extends JFrame {
 	}// </editor-fold>
 		// GEN-END:initComponents
 
-	private void InitStateMouseClicked(java.awt.event.MouseEvent evt) {
+	private void InitStateMouseClicked(MouseEvent evt) {
 		int hostnum = 0;
 		int vmnum = 0;
 		String policy = null;
@@ -378,18 +387,23 @@ public class MainFrame extends JFrame {
 		} catch (Exception e) {
 			err_show.setVisible(true);
 		}
-
 		if (hostnum != 0 && vmnum != 0) {
 			err_show.setVisible(false);
 			ExtendedConstants.setHostNum(hostnum);// 物理机数
 			ExtendedConstants.setVmNum(vmnum);// 虚拟机数
 			Main.init(policy);// 算法执行
 			jTable1.setModel(new DefaultTableModel(Main.getVmsInHost(),
-					new String[] { "主机编号", "虚拟机编号", "CPU", "内存", "带宽", "利用率" }));
+					new String[] { "主机编号", "虚拟机编号", "CPU(%)", "内存(%)", "带宽(%)", "利用率(%)" }));
 			jTable2.setModel(new DefaultTableModel(Main.getVmToHost(),
-					new String[] { "虚拟机编号", "主机编号", "CPU", "内存", "带宽", "利用率" }));
-			// System.out.println(policy);
+					new String[] { "虚拟机编号", "主机编号", "CPU(%)", "内存(%)", "带宽(%)", "利用率(%)" }));
 		}
+	}
+	
+	private void StartMigrateMouseClicked(MouseEvent evt){
+		Thread t1=new RefreshThread();
+//		Thread t2=new HostDynamicLoad();
+		t1.start();
+//		t2.start();
 	}
 
 	/**

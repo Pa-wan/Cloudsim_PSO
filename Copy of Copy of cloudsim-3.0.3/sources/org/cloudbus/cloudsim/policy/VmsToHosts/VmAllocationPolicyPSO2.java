@@ -107,30 +107,4 @@ public class VmAllocationPolicyPSO2 extends VmAllocationPolicy{
 		return null;
 	}
 	
-	public static Object[][] getVmsInHost(){
-		 Object[][] data = null;  
-		    try {     
-		    	data=new Object[6][];
-		    	int clumnCount=vmsInHost.size();
-		    	
-//		        rs.last();  
-//		        int rows = rs.getRow();  
-//		        data = new Object[rows][];    
-//		        ResultSetMetaData md = rs.getMetaData();//获取记录集的元数据  
-//		        int columnCount = md.getColumnCount();//列数  
-//		        rs.first();  
-//		        int k = 0;  
-//		        while(rs.next()) {  
-//		            System.out.println("i"+k);  
-//		            Object[] row = new Object[columnCount];  
-//		            for(int i=0; i<columnCount; i++) {  
-//		                row[i] = rs.getObject(i+1).toString();  
-//		            }  
-//		            data[k] = row;  
-//		            k++;  
-//		        }  
-		    } catch (Exception e) {  
-		    }  
-		return data;
-	}
 }

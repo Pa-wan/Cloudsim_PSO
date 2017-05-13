@@ -19,7 +19,7 @@ public class SelVmMigrating {
 	private double lossRatio;
 	private Map<Vm, Double> lossToVm;
 	private Map<Vm, ArrayList<Double>> loadToVm;
-	private Map<Vm, Host> solution;
+	private static Map<Vm, Host> solution;
 	private double bestDistance;
 	private Host bestHost;
 
@@ -34,8 +34,6 @@ public class SelVmMigrating {
 
 	private void selectVms() {
 		for (Host host : hotList) {
-			List<Map.Entry<Vm, Double>> tempList = new ArrayList<Map.Entry<Vm, Double>>(
-					lossToVm.entrySet());
 			ArrayList<Double> load = new ArrayList<>();
 			for (Vm vm : host.getVmList()) {
 				double vmCPU = vm.getCurrentRequestedTotalMips();
@@ -48,6 +46,8 @@ public class SelVmMigrating {
 				lossToVm.put(vm, lossRatio);
 				loadToVm.put(vm, load);
 			}
+			List<Map.Entry<Vm, Double>> tempList = new ArrayList<Map.Entry<Vm, Double>>(
+					lossToVm.entrySet());
 			Collections.sort(tempList, new Comparator<Map.Entry<Vm, Double>>() {
 				public int compare(Entry<Vm, Double> o1, Entry<Vm, Double> o2) {
 					return o1.getValue() > o2.getValue() ? 1 : -1;
@@ -56,6 +56,7 @@ public class SelVmMigrating {
 			Vm vmMigrating = tempList.get(0).getKey();// 选择开销比例最小的进行迁移
 			bestHost = selectHostMigratein(vmMigrating);
 			bestHost.addMigratingInVm(vmMigrating);
+			bestHost.vmCreate(vmMigrating);
 			solution.put(vmMigrating, bestHost);
 		}
 	}
@@ -83,7 +84,7 @@ public class SelVmMigrating {
 		return bestHost;
 	}
 	
-	public Map<Vm,Host> getSolution(){
+	public static Map<Vm,Host> getSolution(){
 		return solution;
 	}
 	
