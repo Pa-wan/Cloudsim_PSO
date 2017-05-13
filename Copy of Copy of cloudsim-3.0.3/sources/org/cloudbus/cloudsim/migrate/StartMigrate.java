@@ -2,26 +2,22 @@ package org.cloudbus.cloudsim.migrate;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Random;
-
-import org.apache.commons.math3.analysis.function.HarmonicOscillator;
 import org.cloudbus.cloudsim.Host;
 import org.cloudbus.cloudsim.Vm;
 
-import com.sun.org.apache.bcel.internal.generic.RETURN;
-
-public class StartMigrate extends Thread{
+public class StartMigrate implements Runnable{
 	private List<Host> hostList;
 	private List<double[][]> triLoadInHost; //主机预测前三个周期的利用率
 	private double[][] triUtilToHost; //主机三个指标的利用率矩阵
 	private Map<Vm, ArrayList<Double>> triUtilToVm;
 //	private Map<Vm, ArrayList<Double>> 
 	public StartMigrate(List<Host> hostlist){
+		super();
 		this.hostList=hostlist;
+		triLoadInHost=new ArrayList<double[][]>() ;
+		triUtilToVm=new HashMap<Vm,ArrayList<Double>>();
 		triUtilToHost=new double[hostList.size()][3];
 		for(int i=0;i<3;i++){
 			HostDynamicLoad();
@@ -34,7 +30,7 @@ public class StartMigrate extends Thread{
 		while (true) {
 			HostDynamicLoad();
 			prediction.predict(hostList,triLoadInHost);
-			SelVmMigrating selVmMigrating = new SelVmMigrating(triUtilToVm);
+			new SelVmMigrating(triUtilToVm);
 			try { 
 				Thread.sleep(5000);
 			} catch (InterruptedException e) {
@@ -45,9 +41,8 @@ public class StartMigrate extends Thread{
 	
 	private void HostDynamicLoad() {
 		for(Host  host:hostList){
-			double[] utilHost=new double[3];
 			ArrayList<Double> temp1=new ArrayList<Double>();
-			ArrayList<Double> temp2=new ArrayList<Double>();
+			new ArrayList<Double>();
 			for(Vm vm:host.getVmList()){
 				double[] utilVm=new double[3];
 				 utilVm[0]=Math.random();

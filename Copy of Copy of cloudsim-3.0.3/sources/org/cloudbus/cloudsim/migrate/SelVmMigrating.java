@@ -13,7 +13,6 @@ import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.hust.pso2.Utils;
 
 public class SelVmMigrating {
-	private List<Vm> vmList;
 	private List<Host> hotList;
 	private List<Host> unHotList;
 	private double lossRatio;
@@ -34,34 +33,35 @@ public class SelVmMigrating {
 
 	private void selectVms() {
 		for (Host host : hotList) {
-			ArrayList<Double> load = new ArrayList<>();
+			double[] load=new double[3];
 			for (Vm vm : host.getVmList()) {
-				double vmCPU = vm.getCurrentRequestedTotalMips();
-				double vmBw = vm.getCurrentAllocatedBw() / vm.getBw();
-				double vmRam = vm.getCurrentAllocatedRam() / vm.getRam();
-				load.add(vmCPU);
-				load.add(vmBw);
-				load.add(vmRam);
-				lossRatio = vmCPU * vmBw / vmRam;// 开销比例
+				load[0] = loadToVm.get(vm).get(0)*vm.getMips()*vm.getNumberOfPes()/host.getTotalMips();
+				load[1] = loadToVm.get(vm).get(1)*vm.getBw()/host.getBw();
+				load[2] = loadToVm.get(vm).get(2)*vm.getRam()/host.getRam();
+				lossRatio = load[0] * load[1] / load[2];// 开销比例
 				lossToVm.put(vm, lossRatio);
-				loadToVm.put(vm, load);
 			}
 			List<Map.Entry<Vm, Double>> tempList = new ArrayList<Map.Entry<Vm, Double>>(
 					lossToVm.entrySet());
 			Collections.sort(tempList, new Comparator<Map.Entry<Vm, Double>>() {
 				public int compare(Entry<Vm, Double> o1, Entry<Vm, Double> o2) {
-					return o1.getValue() > o2.getValue() ? 1 : -1;
+					return o1.getValue() > o2.getValue() ? -1 : 1;
 				}
 			});
-			Vm vmMigrating = tempList.get(0).getKey();// 选择开销比例最小的进行迁移
-			bestHost = selectHostMigratein(vmMigrating);
+			Vm vmMigrating = tempList.get(0).getKey();// 选择开销比例最大的进行迁移
+			bestHost = selectHostMigrate(vmMigrating);
 			bestHost.addMigratingInVm(vmMigrating);
 			bestHost.vmCreate(vmMigrating);
+			bestHost.getVmList().add(vmMigrating);
 			solution.put(vmMigrating, bestHost);
+			vmMigrating.setCurrentAllocatedSize(vmMigrating.getSize());
+			List<Double> list=new ArrayList<Double>();
+			list.add(vmMigrating.getCurrentRequestedTotalMips());
+			vmMigrating.setCurrentAllocatedMips(list);
 		}
 	}
 
-	private Host selectHostMigratein(Vm vm) {
+	private Host selectHostMigrate(Vm vm) {
 		unHotList = prediction.getunHotList();
 		double tempdistance = Double.MAX_VALUE;
 		for (Host host : unHotList) {
@@ -89,7 +89,7 @@ public class SelVmMigrating {
 	}
 	
 	public void setSolution(Map<Vm, Host> solution){
-		this.solution=solution;
+		SelVmMigrating.solution=solution;
 	}
 }
 

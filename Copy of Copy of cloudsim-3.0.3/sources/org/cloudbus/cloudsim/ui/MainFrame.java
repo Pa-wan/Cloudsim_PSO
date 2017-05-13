@@ -8,12 +8,12 @@ package org.cloudbus.cloudsim.ui;
 
 import java.awt.Dimension;
 import java.awt.Toolkit;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Enumeration;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 
-import org.cloudbus.cloudsim.migrate.StartMigrate;
 import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
 import org.cloudbus.cloudsim.policy.utils.ExtendedConstants;
 
@@ -252,9 +252,9 @@ public class MainFrame extends JFrame {
 		GlobalObject.setjTable(jTable3);
 		Start_Migrate.setText("动态模拟");
 
-		Start_Migrate.addMouseListener(new java.awt.event.MouseAdapter() {
+		Start_Migrate.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(java.awt.event.MouseEvent evt) {
-				StartMigrateMouseClicked(evt);
+				Main.test();
 			}
 		});
 		GroupLayout layout = new GroupLayout(getContentPane());
@@ -318,8 +318,7 @@ public class MainFrame extends JFrame {
 								.addPreferredGap(
 										LayoutStyle.ComponentPlacement.RELATED)
 								.addComponent(jScrollPane3,
-										GroupLayout.PREFERRED_SIZE,
-										200,
+										GroupLayout.PREFERRED_SIZE, 200,
 										GroupLayout.PREFERRED_SIZE)
 								.addContainerGap()));
 		layout.setVerticalGroup(layout
@@ -393,17 +392,12 @@ public class MainFrame extends JFrame {
 			ExtendedConstants.setVmNum(vmnum);// 虚拟机数
 			Main.init(policy);// 算法执行
 			jTable1.setModel(new DefaultTableModel(Main.getVmsInHost(),
-					new String[] { "主机编号", "虚拟机编号", "CPU(%)", "内存(%)", "带宽(%)", "利用率(%)" }));
+					new String[] { "主机编号", "虚拟机编号", "CPU(%)", "内存(%)", "带宽(%)",
+							"利用率(%)" }));
 			jTable2.setModel(new DefaultTableModel(Main.getVmToHost(),
-					new String[] { "虚拟机编号", "主机编号", "CPU(%)", "内存(%)", "带宽(%)", "利用率(%)" }));
+					new String[] { "虚拟机编号", "主机编号", "CPU(%)", "内存(%)", "带宽(%)",
+							"利用率(%)" }));
 		}
-	}
-	
-	private void StartMigrateMouseClicked(MouseEvent evt){
-		Thread t1=new RefreshThread();
-//		Thread t2=new HostDynamicLoad();
-		t1.start();
-//		t2.start();
 	}
 
 	/**

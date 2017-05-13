@@ -1,15 +1,8 @@
 package org.cloudbus.cloudsim.migrate;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-
 import org.cloudbus.cloudsim.Host;
-
-import com.sun.org.apache.bcel.internal.generic.AALOAD;
 
 public class prediction {
 	private static List<Host> hostList;
@@ -24,6 +17,7 @@ public class prediction {
 		unHotList = new ArrayList<Host>();
 		hostList = hostlist;
 		int size = hostList.size();
+		loadToHost=new ArrayList<double[][]>();
 		double[][] Eload = new double[size][3];// 取预测前三个周期的负载平均值为预测初值
 		for (int i = 0; i < size; i++) {
 			for (int j = 0; j < 3; j++)
@@ -42,9 +36,9 @@ public class prediction {
 		int[] cnt = new int[size];
 		for (int i = 0; i < size; i++) {
 			for (int j = 0; j < 5; j++) {
-				if (loadToHost.get(j)[i][0] < 0.8
-						&& loadToHost.get(j)[i][1] < 0.8
-						&& loadToHost.get(j)[i][2] < 0.8) {
+				if (loadToHost.get(j)[i][0] < 0.5
+						&& loadToHost.get(j)[i][1] < 0.5
+						&& loadToHost.get(j)[i][2] < 0.5) {
 				} else {
 					cnt[i]++;
 				}
@@ -69,7 +63,7 @@ public class prediction {
 	}
 
 	public void setHotList(List<Host> hotlist) {
-		this.hotList = hotlist;
+		prediction.hotList = hotlist;
 	}
 
 	public static List<Host> getunHotList() {
@@ -77,6 +71,6 @@ public class prediction {
 	}
 
 	public void setunHotList(List<Host> unHotlist) {
-		this.unHotList = unHotlist;
+		prediction.unHotList = unHotlist;
 	}
 }

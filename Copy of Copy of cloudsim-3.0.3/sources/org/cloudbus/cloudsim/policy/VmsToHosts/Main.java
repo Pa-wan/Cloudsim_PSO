@@ -21,6 +21,7 @@ import org.cloudbus.cloudsim.policy.utils.ExtHelper;
 import org.cloudbus.cloudsim.policy.utils.ExtendedConstants;
 import org.cloudbus.cloudsim.policy.utils.ExtDatacenter;
 import org.cloudbus.cloudsim.policy.utils.ExtDatacenterBrocker;
+import org.cloudbus.cloudsim.ui.RefreshThread;
 
 public class Main {
 	private static List<Vm> vmlist;
@@ -80,14 +81,15 @@ public class Main {
 
 			// 第四步: Create VMs and Cloudlets and send them to broker
 			int numberOfVms = ExtendedConstants.numberOfVms;
-			vmlist = ExtHelper.createVmList(brokerId, numberOfVms); // creating vms
+			vmlist = ExtHelper.createVmList(brokerId, numberOfVms); // creating
+																	// vms
 			broker.submitVmList(vmlist);
 
 			double start = System.currentTimeMillis();
 			double lastClock = CloudSim.startSimulation();
-//			StartMigrate hostDynamicLoad = new StartMigrate(hostList);
+			// StartMigrate hostDynamicLoad = new StartMigrate(hostList);
 			double end = System.currentTimeMillis();
-//			hostDynamicLoad.run();
+			// hostDynamicLoad.run();
 			System.out.println("time: " + (end - start) / 1000 + "s");
 
 			List<Cloudlet> newList = broker.getCloudletReceivedList();
@@ -273,5 +275,14 @@ public class Main {
 			}
 		}
 		return data;
+	}
+
+	public static void test() {
+		
+		StartMigrate t1 = new StartMigrate(hostList);
+		RefreshThread t2 = new RefreshThread();
+		
+		new Thread(t1).start();
+		new Thread(t2).start();
 	}
 }
