@@ -1,9 +1,5 @@
 package org.cloudbus.cloudsim.policy.VmToHost;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -15,8 +11,6 @@ import org.cloudbus.cloudsim.Host;
 import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.VmAllocationPolicy;
 import org.cloudbus.cloudsim.hust.pso2.Utils;
-import org.cloudbus.cloudsim.policy.ConstantConfig;
-import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
 
 public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 	private Map<String, Integer> vmToHost;

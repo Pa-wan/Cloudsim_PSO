@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.cloudbus.cloudsim.Host;
 
-public class prediction {
+public class Prediction {
 	private static List<Host> hostList;
 	private static List<Host> hotList;
 	private static List<Host> unHotList;
@@ -27,9 +27,14 @@ public class prediction {
 		double[][] temp = new double[size][3];
 		for (int i = 0; i < 5; i++) {// 预测后5个周期的负载
 			for (int j = 0; j < size; j++) {
-				for (int k = 0; k < 3; k++) {
-					temp[j][k] = calcuPreLoad(hostList.get(j), Eload[j][k]);
-				}
+				Host host = hostList.get(j);
+				temp[j][0] = calcuPreLoad(
+						(host.getTotalMips() - host.getAvailableMips())
+								/ host.getTotalMips(), Eload[j][0]);
+				temp[j][1] = calcuPreLoad(host.getRamProvisioner().getUsedRam()
+						/ (host.getRam() + 0.0), Eload[j][1]);
+				temp[j][2] = calcuPreLoad(host.getBwProvisioner().getUsedBw()
+						/ (host.getBw() + 0.0), Eload[j][2]);
 			}
 			loadToHost.add(temp);
 		}
@@ -51,9 +56,8 @@ public class prediction {
 		}
 	}
 
-	private static double calcuPreLoad(Host host, double lastCalLoad) {
+	private static double calcuPreLoad(double Uload, double lastCalLoad) {
 		double calcuLoad = 0;
-		double Uload = host.getLoad();
 		calcuLoad = lastCalLoad + a * (Uload - lastCalLoad);
 		return calcuLoad;
 	}
@@ -63,7 +67,7 @@ public class prediction {
 	}
 
 	public void setHotList(List<Host> hotlist) {
-		prediction.hotList = hotlist;
+		Prediction.hotList = hotlist;
 	}
 
 	public static List<Host> getunHotList() {
@@ -71,6 +75,6 @@ public class prediction {
 	}
 
 	public void setunHotList(List<Host> unHotlist) {
-		prediction.unHotList = unHotlist;
+		Prediction.unHotList = unHotlist;
 	}
 }

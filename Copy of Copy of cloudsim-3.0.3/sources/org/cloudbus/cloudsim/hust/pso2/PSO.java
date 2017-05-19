@@ -60,21 +60,14 @@ public class PSO {
 	 }
 
 	public void solve(){
-		int δ = 2;	
 		int i;
 		System.out.println("=========run start========");
 		for (i = 0; i < runtime; i++) {
-			double c1 = 0.5 + (4.5 - 0.5) / (Math.sqrt(2 * Math.PI) * δ)
-					* Math.exp(-(i / runtime) * (i / runtime) / (2 * δ * δ));
-			double c2 = 2.5 + (0.5 - 2.5) / (Math.sqrt(2 * Math.PI) * δ)
-					* Math.exp(-(i / runtime) * (i / runtime) / (2 * δ * δ));
 			Particle tempbest = null; // 当前迭代中最优粒子
 			Particle tempworst = null;// 当前迭代中最差粒子
 			global_worst = 0;
-			// Particle.w=0.9-0.5/runtimes*cnt;
 			// 每个粒子更新位置和适应值
 			for (int j = 0; j < pcount; j++) {
-				pars[j].setC(c1, c2);
 				if (global_best > pars[j].getFitness()) {
 					global_best = pars[j].getFitness();
 					tempbest = pars[j];

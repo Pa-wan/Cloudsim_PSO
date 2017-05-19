@@ -55,6 +55,8 @@ public class Host {
 
 	/** The datacenter where the host is placed. */
 	private Datacenter datacenter;
+	
+	private double load;
 
 	/**
 	 * Instantiates a new host.
@@ -664,7 +666,7 @@ public class Host {
 		double uCPU=(getTotalMips()-getAvailableMips())/getTotalMips();
 		double uRam=getRamProvisioner().getUsedRam()/(getRam()+0.0);
 		double uBw=getBwProvisioner().getUsedBw()/(getBw()+0.0);
-		load=0.7*uCPU+0.2*uRam+0.1*uBw;
+		load=(1/(1-uCPU))*(1/(1-uRam))*(1/(1-uBw));
 		return load;
 	}
 }

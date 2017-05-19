@@ -216,15 +216,14 @@ public class Main {
 		int k = 0;
 		for (Vm vm : vmlist) {
 			try {
-				Object[] row = new Object[6];
+				Object[] row = new Object[5];
 				row[0] = vm.getId();
 				row[1] = vm.getHost().getId();
-				row[2] = 0;
+				row[2] = 100;
 				row[3] = decfmt.format(100 * vm.getCurrentAllocatedRam()
 						/ vm.getRam());
 				row[4] = decfmt.format(100 * vm.getCurrentAllocatedBw()
 						/ vm.getBw());
-				row[5] = 0;
 				data[k++] = row;
 			} catch (Exception e) {
 			}
@@ -234,7 +233,6 @@ public class Main {
 
 	public static Object[][] getVmsInHost() {
 		Object[][] data = new Object[hostList.size()][];
-
 		int k = 0;
 		for (Host host : hostList) {
 			try {
@@ -251,7 +249,7 @@ public class Main {
 						* 100 / host.getRam());
 				row[4] = decfmt.format(host.getBwProvisioner().getUsedBw()
 						* 100 / host.getBw());
-				row[5] = 0;
+				row[5] = decfmt.format(host.getLoad());
 				data[k++] = row;
 			} catch (Exception e) {
 			}
@@ -277,11 +275,9 @@ public class Main {
 		return data;
 	}
 
-	public static void test() {
-		
+	public static void test() {	
 		StartMigrate t1 = new StartMigrate(hostList);
 		RefreshThread t2 = new RefreshThread();
-		
 		new Thread(t1).start();
 		new Thread(t2).start();
 	}

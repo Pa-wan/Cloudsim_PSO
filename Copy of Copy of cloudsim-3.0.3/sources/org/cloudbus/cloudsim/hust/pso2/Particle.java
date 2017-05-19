@@ -11,6 +11,8 @@ import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
 import org.cloudbus.cloudsim.policy.utils.ExtHelper;
 
+import com.sun.org.apache.bcel.internal.generic.LoadClass;
+
 public class Particle {
 	private int bestLoad;// 最佳负载区间物理机数量
 	public double bestfitness; // 粒子本身的最优解
@@ -136,23 +138,17 @@ public class Particle {
 		double load = 0;
 		// 在对物理机进行均衡度计算时才更新每个物理机的资源状态
 		for (Host host : hostlist) {
-			double temp=0;
 			for (Vm vm : host.getVmList())
 				updateResource(vm, host);
 			// VMPlacement.updateHost(host);// 根据主机中vmlist编号更新主机资源
-			util[host.getId()][0] = (host.getTotalMips() - host
-					.getAvailableMips()) / host.getTotalMips();
-			util[host.getId()][1] = host.getRamProvisioner().getUsedRam()
-					/ (host.getRam() + 0.0);
-			util[host.getId()][2] = host.getBwProvisioner().getUsedBw()
-					/ (host.getBw() + 0.0);
-			for(int i=0;i<3;i++){
-				temp+=Math.pow(util[host.getId()][i], 2);
-			}
-//			load = Math.sqrt(util[host.getId()][0] * util[host.getId()][0]
-//					+ util[host.getId()][1] * util[host.getId()][1]
-//					+ util[host.getId()][2] * util[host.getId()][2]);
-			load=Math.sqrt(temp);
+//			util[host.getId()][0] = (host.getTotalMips() - host
+//					.getAvailableMips()) / host.getTotalMips();
+//			util[host.getId()][1] = host.getRamProvisioner().getUsedRam()
+//					/ (host.getRam() + 0.0);
+//			util[host.getId()][2] = host.getBwProvisioner().getUsedBw()
+//					/ (host.getBw() + 0.0);
+//				load=(1/(1-util[host.getId()][0]))*(1/(1-util[host.getId()][1]))*(1/(1-util[host.getId()][2]));
+			load=host.getLoad();
 			utilAvg[host.getId()] = load;
 		}
 		fitness = StandardDiviation(utilAvg);
@@ -172,7 +168,7 @@ public class Particle {
 	private void updatePos() {// 更新位置和速度
 		// 线性减少w，正态函数动态调整c1，c2
 		w = 0.9 - 0.5 / 100 * cnt;
-
+		c1=c2=2;
 		for (Vm vm : vmlist) {
 			updateVmList(vm);
 			size = fitList.size();
@@ -236,10 +232,5 @@ public class Particle {
 
 	public void setBestLoad(int bestLoad) {
 		this.bestLoad = bestLoad;
-	}
-
-	public void setC(double c1, double c2) {
-		this.c1 = c1;
-		this.c2 = c2;
 	}
 }

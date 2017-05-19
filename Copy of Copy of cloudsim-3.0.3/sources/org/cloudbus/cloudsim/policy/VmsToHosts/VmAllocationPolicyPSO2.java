@@ -11,6 +11,7 @@ import org.cloudbus.cloudsim.Host;
 import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.VmAllocationPolicy;
 import org.cloudbus.cloudsim.hust.pso2.PSO;
+import org.cloudbus.cloudsim.hust.pso2.Utils;
 
 import com.sun.org.apache.bcel.internal.generic.RETURN;
 
@@ -62,9 +63,7 @@ public class VmAllocationPolicyPSO2 extends VmAllocationPolicy{
 			host.vmCreate(vm);//更新资源，CurrentAllocatedMips,CurrentAllocatedSize
 			host.getVmList().add(vm);
 			vm.setCurrentAllocatedSize(vm.getSize());
-			List<Double> list=new ArrayList<Double>();
-			list.add(vm.getCurrentRequestedTotalMips());
-			vm.setCurrentAllocatedMips(list);
+			Utils.updateVmResource(vm);
 		}
 		Object map=vmToHost;
 		List<Map<String, Object>> list=new ArrayList<Map<String,Object>>();
