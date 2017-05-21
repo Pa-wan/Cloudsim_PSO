@@ -13,7 +13,7 @@ public class StartMigrate implements Runnable {
 	private List<Host> hostList;
 	private List<double[][]> triLoadInHost; // 主机预测前三个周期的利用率
 	private double[][] triUtilToHost; // 主机三个指标的利用率矩阵
-	private Map<Vm, ArrayList<Double>> triUtilToVm;
+	private static Map<Vm, ArrayList<Double>> triUtilToVm;
 
 	// private Map<Vm, ArrayList<Double>>
 	public StartMigrate(List<Host> hostlist) {
@@ -45,17 +45,17 @@ public class StartMigrate implements Runnable {
 	}
 
 	private void HostDynamicLoad() {
+		Random rnd = new Random();
 		for (Host host : hostList) {
 			ArrayList<Double> temp1 = new ArrayList<Double>();
 			new ArrayList<Double>();
 			for (Vm vm : host.getVmList()) {
 				double[] utilVm = new double[3];
-				Random rnd = new Random();
-				utilVm[0] = (double) (rnd.nextInt(50) + 50) / 100;
-				utilVm[1] = (double) (rnd.nextInt(50) + 50) / 100;
-				utilVm[2] = (double) (rnd.nextInt(50) + 50) / 100;
+				utilVm[0] = (double) (rnd.nextInt(50) + 50) / 100;			
 				temp1.add(utilVm[0]);
+				utilVm[1] = (double) (rnd.nextInt(50) + 50) / 100;
 				temp1.add(utilVm[1]);
+				utilVm[2] = (double) (rnd.nextInt(50) + 50) / 100;
 				temp1.add(utilVm[2]);
 				triUtilToVm.put(vm, temp1);
 				triUtilToHost[host.getId()][0] += utilVm[0]
@@ -73,7 +73,7 @@ public class StartMigrate implements Runnable {
 		return triUtilToHost;
 	}
 	
-	public Map<Vm, ArrayList<Double>> getTriUtilToVm(){
+	public static Map<Vm, ArrayList<Double>> getTriUtilToVm(){
 		return triUtilToVm;
 	}
 

@@ -14,7 +14,7 @@ public class RefreshThread implements Runnable{
             	GlobalObject.getjTable2().setModel(new DefaultTableModel(Main.getVmToHost(),new String[] { "虚拟机编号", "主机编号",
     				"CPU(%)", "内存(%)", "带宽(%)" }));
             	GlobalObject.getjTable3().setModel(new DefaultTableModel(Main.getVmMigrate(),new String[] { "待迁移虚拟机编号",
-				"目的主机编号" } ));
+					"源主机编号","目的主机编号" }));
                 Thread.sleep(200);
             } catch (Exception e) {
                 e.printStackTrace();

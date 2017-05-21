@@ -11,14 +11,9 @@ import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
 import org.cloudbus.cloudsim.policy.utils.ExtHelper;
 
-import com.sun.org.apache.bcel.internal.generic.LoadClass;
-
 public class Particle {
 	private int bestLoad;// 最佳负载区间物理机数量
 	public double bestfitness; // 粒子本身的最优解
-	// private Map<String,Integer> vmTohost;//每个粒子每次循环输出一个方案
-
-	private double util[][];// 利用率矩阵
 	private int[] pos;// 粒子的位置，数组的维度表示虚拟机的个数
 	private int[] v;
 	private double fitness;
@@ -26,7 +21,7 @@ public class Particle {
 	public static int[] gbest; // 所有粒子找到的最好位置
 	private double pbest_fitness;// 粒子的历史最优适应值
 	private int dims;
-	private double w;
+	public double w;
 	private double c1;
 	private double c2;
 	private static Random rnd;
@@ -54,7 +49,6 @@ public class Particle {
 		pbest_fitness = Double.MAX_VALUE;
 		vmTohost = new HashMap<String, Integer>();
 		utilAvg = new double[hostlist.size()];
-		util = new double[hostlist.size()][3];
 	}
 
 	public void init() {
@@ -140,15 +134,11 @@ public class Particle {
 		for (Host host : hostlist) {
 			for (Vm vm : host.getVmList())
 				updateResource(vm, host);
-			// VMPlacement.updateHost(host);// 根据主机中vmlist编号更新主机资源
-//			util[host.getId()][0] = (host.getTotalMips() - host
-//					.getAvailableMips()) / host.getTotalMips();
-//			util[host.getId()][1] = host.getRamProvisioner().getUsedRam()
-//					/ (host.getRam() + 0.0);
-//			util[host.getId()][2] = host.getBwProvisioner().getUsedBw()
-//					/ (host.getBw() + 0.0);
-//				load=(1/(1-util[host.getId()][0]))*(1/(1-util[host.getId()][1]))*(1/(1-util[host.getId()][2]));
-			load=host.getLoad();
+			double uCPU=(host.getTotalMips()-host.getAvailableMips())/host.getTotalMips();
+			double uRam=host.getRamProvisioner().getUsedRam()/(host.getRam()+0.0);
+			double uBw=host.getBwProvisioner().getUsedBw()/(host.getBw()+0.0);
+			load=Math.sqrt(uCPU*uCPU+uRam*uRam+uBw*uBw);
+//			load=host.getLoad();
 			utilAvg[host.getId()] = load;
 		}
 		fitness = StandardDiviation(utilAvg);
@@ -167,7 +157,7 @@ public class Particle {
 	 */
 	private void updatePos() {// 更新位置和速度
 		// 线性减少w，正态函数动态调整c1，c2
-		w = 0.9 - 0.5 / 100 * cnt;
+//		w = 0.9 - (0.9-0.4)/ 400 * cnt;
 		c1=c2=2;
 		for (Vm vm : vmlist) {
 			updateVmList(vm);
@@ -218,6 +208,13 @@ public class Particle {
 		this.pos = pos;
 	}
 
+	public int[] getv() {
+		return v;
+	}
+
+	public void setv(int[] v) {
+		this.v = v;
+	}
 	public Map<String, Integer> getVmTohost() {
 		return vmTohost;
 	}

@@ -15,7 +15,6 @@ import org.cloudbus.cloudsim.hust.pso2.Utils;
 public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 	private Map<String, Integer> vmToHost;
 	private Map<Integer, ArrayList<Integer>> vmsInHost;
-	private List<Vm> vmList;
 	private double banlanceDegree;// 总体不均衡度
 	public VmAllocationPolicyRandom(List<? extends Host> list) {
 		super(list);
@@ -37,8 +36,6 @@ public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 	@Override
 	public List<Map<String, Object>> optimizeAllocation(
 			List<? extends Vm> vmList) {
-		List<Vm> vms = (List<Vm>) vmList;
-		this.vmList = vms;
 		vmToHost = new HashMap<String, Integer>();
 		vmsInHost = new HashMap<Integer, ArrayList<Integer>>();
 		// 匹配可以放置该vm的物理机
@@ -84,26 +81,14 @@ public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 	}
 
 	private void calcuMd() {
-		double util[][]=new double[getHostList().size()][3];// 利用率矩阵
 		double[] utilAvg = new double[getHostList().size()];
-		double load = 0;
 		// 在对物理机进行均衡度计算时才更新每个物理机的资源状态
 		for (Host host : getHostList()) {
-			double temp=0;
-			util[host.getId()][0] = (host.getTotalMips() - host
-					.getAvailableMips()) / host.getTotalMips();
-			util[host.getId()][1] = host.getRamProvisioner().getUsedRam()
-					/ (host.getRam() + 0.0);
-			util[host.getId()][2] = host.getBwProvisioner().getUsedBw()
-					/ (host.getBw() + 0.0);
-			for(int i=0;i<3;i++){
-				temp+=Math.pow(util[host.getId()][i], 2);
-			}
-//			load = Math.sqrt(util[host.getId()][0] * util[host.getId()][0]
-//					+ util[host.getId()][1] * util[host.getId()][1]
-//					+ util[host.getId()][2] * util[host.getId()][2]);
-			load=Math.sqrt(temp);
-			utilAvg[host.getId()] = load;
+			double uCPU=(host.getTotalMips()-host.getAvailableMips())/host.getTotalMips();
+			double uRam=host.getRamProvisioner().getUsedRam()/(host.getRam()+0.0);
+			double uBw=host.getBwProvisioner().getUsedBw()/(host.getBw()+0.0);
+			double load=Math.sqrt(uCPU*uCPU+uRam*uRam+uBw*uBw);
+			utilAvg[host.getId()] =load;
 		}
 		banlanceDegree = StandardDiviation(utilAvg);
 		System.out.println("banlanceDegree=" + banlanceDegree);
@@ -127,22 +112,6 @@ public class VmAllocationPolicyRandom extends VmAllocationPolicy {
 		}
 		return Math.sqrt(dVar / m);
 	}
-	private Host getHostById(Integer id) {
-		for (Host host : getHostList()) {
-			if (host.getId() == id)
-				return host;
-		}
-		return null;
-	}
-
-	private Vm getVmByUid(String uid) {
-		for (Vm vm : vmList) {
-			if (vm.getUid().equals(uid))
-				return vm;
-		}
-		return null;
-	}
-
 	@Override
 	public void deallocateHostForVm(Vm vm) {
 

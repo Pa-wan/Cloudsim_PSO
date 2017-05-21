@@ -62,12 +62,13 @@ public class PSO {
 	public void solve(){
 		int i;
 		System.out.println("=========run start========");
-		for (i = 0; i < runtime; i++) {
+		for (i = 1; i <=runtime; i++) {
 			Particle tempbest = null; // 当前迭代中最优粒子
 			Particle tempworst = null;// 当前迭代中最差粒子
 			global_worst = 0;
 			// 每个粒子更新位置和适应值
 			for (int j = 0; j < pcount; j++) {
+				pars[j].w=0.9-0.5/runtime*i;
 				if (global_best > pars[j].getFitness()) {
 					global_best = pars[j].getFitness();
 					tempbest = pars[j];
@@ -91,9 +92,11 @@ public class PSO {
 			for (Vm vm : vmlist) {
 				for (int j = 0; j < pcount; j++) {
 					pars[pcount].getPos()[vm.getId()] += pars[j].getPos()[vm.getId()];
+					pars[pcount].getv()[vm.getId()] += pars[j].getv()[vm.getId()];
 				}
 				pars[pcount].getPos()[vm.getId()] = pars[pcount].getPos()[vm.getId()]
 						/ pcount;
+				pars[pcount].getv()[vm.getId()] = pars[pcount].getv()[vm.getId()]/ pcount;
 			}// 计算粒子群位置的平均值存在在附加的粒子中
 			if (tempworst != null)
 				tempworst.count++;
@@ -102,6 +105,7 @@ public class PSO {
 					// pars[i].updateParticle(pars[pcount]);
 					for (Vm vm : vmlist) {
 						pars[j].getPos()[vm.getId()] = pars[pcount].getPos()[vm.getId()];
+						pars[j].getv()[vm.getId()] = pars[pcount].getv()[vm.getId()];
 					}
 				}
 				pars[j].count = 0;

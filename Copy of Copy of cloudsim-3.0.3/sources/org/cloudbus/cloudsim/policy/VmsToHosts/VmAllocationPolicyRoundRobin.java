@@ -1,20 +1,27 @@
 package org.cloudbus.cloudsim.policy.VmsToHosts;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.Vector;
+import java.util.Map.Entry;
 
 import org.cloudbus.cloudsim.Host;
 import org.cloudbus.cloudsim.Log;
 import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.VmAllocationPolicy;
+import org.cloudbus.cloudsim.hust.pso2.Utils;
 import org.cloudbus.cloudsim.policy.ListAllocationPolicy;
 import org.cloudbus.cloudsim.policy.utils.ExtendedHelper;
 
 public class VmAllocationPolicyRoundRobin extends VmAllocationPolicy implements ListAllocationPolicy {
 
+	private Map<String, Integer> vmToHost;
+	private Map<Integer, ArrayList<Integer>> vmsInHost;
+	private double banlanceDegree;// 总体不均衡度
     /** The vm table. */
     private Map<String, Host> vmTable;
     private static final String LINE_SEPARATOR = ExtendedHelper.getLineSeparator();
@@ -32,16 +39,6 @@ public class VmAllocationPolicyRoundRobin extends VmAllocationPolicy implements 
 
 	@Override
 	public boolean allocateHostForVmList(List<Vm> vmsToAllocate) {
-		 printLogMsg("Allocating host for "+vmsToAllocate.size()+" vms ");
-		 //遍历每一个虚拟机
-		 int count=0,size=vmsToAllocate.size();
-		 for(Vm vm:vmsToAllocate){
-			 if(allocateHostForVm(vm))
-				 count++;
-		 }
-		 
-		 if(count==size)
-			 return true;
 		return false;
 	}
 	
@@ -51,7 +48,16 @@ public class VmAllocationPolicyRoundRobin extends VmAllocationPolicy implements 
             if(result) {
                 printLogMsg("Vm created successfuly");
                 getVmTable().put(vm.getUid(), host);
-                
+                host.getVmList().add(vm);
+                Utils.updateVmResource(vm);
+				vmToHost.put(vm.getUid(), host.getId());
+				if (!vmsInHost.containsKey(host.getId())) {
+					ArrayList<Integer> list = new ArrayList<Integer>();
+					list.add(vm.getId());
+					vmsInHost.put(host.getId(), list);
+				} else {
+					vmsInHost.get(host.getId()).add(vm.getId());
+				}
                 //放入物理机虚拟机映射
                 Vector<Integer>value=deployMap.get(host.getId());
                 if(value==null)
@@ -69,7 +75,6 @@ public class VmAllocationPolicyRoundRobin extends VmAllocationPolicy implements 
     
     @Override
     public boolean allocateHostForVm(Vm vm) {
-        printLogMsg("Allocate host for vm");
     	List<Host> hostList=getHostList();
     	int hostSize=hostList.size();
     	
@@ -99,28 +104,88 @@ public class VmAllocationPolicyRoundRobin extends VmAllocationPolicy implements 
 
 	@Override
 	public List<Map<String, Object>> optimizeAllocation(List<? extends Vm> vmList) {
-		// TODO Auto-generated method stub
+		int count=0, size=vmList.size();
+		vmToHost = new HashMap<String, Integer>();
+		vmsInHost = new HashMap<Integer, ArrayList<Integer>>();
+		for(Vm vm:vmList){
+			if(allocateHostForVm(vm)){
+				count++;
+			}	
+		}
+		if(count==size){
+			Object map = vmToHost;
+			List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+			list.add((Map<String, Object>) map);
+			calcuMd();
+			Iterator<Entry<Integer, ArrayList<Integer>>> itor=vmsInHost.entrySet().iterator();
+			while(itor.hasNext()){
+				Entry<Integer, ArrayList<Integer>> entry=itor.next();
+				System.out.print(entry.getKey()+":size="+entry.getValue().size()+"   ");
+				for(Integer i:entry.getValue())
+				  System.out.print(i+"  ");
+				System.out.println();
+			}
+			}
 		return null;
 	}
 
     @Override
     public void deallocateHostForVm(Vm vm) {
-        Host host = getVmTable().remove(vm.getUid());
-        if (host != null) {
-            host.vmDestroy(vm);
-        }
+
     }
 
     @Override
     public Host getHost(Vm vm){
-        return getVmTable().get(vm.getUid());
+    	int id = vmToHost.get(vm.getUid());
+		for (Host host : getHostList()) {
+			if (host.getId() == id)
+				return host;
+		}
+		return null;
     }
 
     @Override
     public Host getHost(int vmId, int userId) {
-        return getVmTable().get(Vm.getUid(userId, vmId));
+    	String Uid = userId + "-" + vmId;
+		int id = vmToHost.get(Uid);
+		for (Host host : getHostList()) {
+			if (host.getId() == id)
+				return host;
+		}
+		return null;
     }
-	
+    private void calcuMd() {
+		double[] utilAvg = new double[getHostList().size()];
+		// 在对物理机进行均衡度计算时才更新每个物理机的资源状态
+		for (Host host : getHostList()) {
+			double uCPU=(host.getTotalMips()-host.getAvailableMips())/host.getTotalMips();
+			double uRam=host.getRamProvisioner().getUsedRam()/(host.getRam()+0.0);
+			double uBw=host.getBwProvisioner().getUsedBw()/(host.getBw()+0.0);
+			double load=Math.sqrt(uCPU*uCPU+uRam*uRam+uBw*uBw);
+			utilAvg[host.getId()] =load;
+		}
+		banlanceDegree = StandardDiviation(utilAvg);
+		System.out.println("banlanceDegree=" + banlanceDegree);
+	}
+	/**
+	 * 求标准差
+	 * 
+	 * @param x
+	 * @return
+	 */
+	private static double StandardDiviation(double[] x) {
+		int m = x.length;
+		double sum = 0;
+		for (int i = 0; i < m; i++) {// 求和
+			sum += x[i];
+		}
+		double dAve = sum / m;// 求平均值
+		double dVar = 0;
+		for (int i = 0; i < m; i++) {// 求方差
+			dVar += (x[i] - dAve) * (x[i] - dAve);
+		}
+		return Math.sqrt(dVar / m);
+	}
 	@Override
 	public boolean allocateHostForVm(Vm vm, Host host) {
 		// TODO Auto-generated method stub

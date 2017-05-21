@@ -244,8 +244,8 @@ public class MainFrame extends JFrame {
 		jScrollPane2.setViewportView(jTable2);
 
 		jTable3.setModel(new DefaultTableModel(
-				new Object[][] { { null, null } }, new String[] { "待迁移虚拟机编号",
-						"目的主机编号" }));
+				new Object[][] { { null, null ,null} }, new String[] { "待迁移虚拟机编号",
+						"源主机编号","目的主机编号" }));
 		jScrollPane3.setViewportView(jTable3);
 
 		GlobalObject.setjScrollPane1(jScrollPane1);

@@ -1,6 +1,7 @@
 package org.cloudbus.cloudsim.policy.VmsToHosts;
 
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -86,10 +87,8 @@ public class Main {
 			broker.submitVmList(vmlist);
 
 			double start = System.currentTimeMillis();
-			double lastClock = CloudSim.startSimulation();
-			// StartMigrate hostDynamicLoad = new StartMigrate(hostList);
+			CloudSim.startSimulation();
 			double end = System.currentTimeMillis();
-			// hostDynamicLoad.run();
 			System.out.println("time: " + (end - start) / 1000 + "s");
 
 			List<Cloudlet> newList = broker.getCloudletReceivedList();
@@ -214,16 +213,25 @@ public class Main {
 	public static Object[][] getVmToHost() {
 		Object[][] data = new Object[vmlist.size()][];
 		int k = 0;
+		Map<Vm, ArrayList<Double>> triUtilToVm=StartMigrate.getTriUtilToVm();
 		for (Vm vm : vmlist) {
 			try {
 				Object[] row = new Object[5];
 				row[0] = vm.getId();
-				row[1] = vm.getHost().getId();
-				row[2] = 100;
-				row[3] = decfmt.format(100 * vm.getCurrentAllocatedRam()
-						/ vm.getRam());
-				row[4] = decfmt.format(100 * vm.getCurrentAllocatedBw()
-						/ vm.getBw());
+				row[1] = vm.getHost().getId();		
+				if(triUtilToVm!=null){
+					ArrayList<Double> temp=triUtilToVm.get(vm);
+					row[2] =decfmt.format(temp.get(0)*100);
+					row[3] = decfmt.format(temp.get(1)*100);
+					row[4] = decfmt.format(temp.get(2)*100);
+				}else {
+					row[2] = 100;
+					row[3] = decfmt.format(100 * vm.getCurrentAllocatedRam()
+							/ vm.getRam());
+					row[4] = decfmt.format(100 * vm.getCurrentAllocatedBw()
+							/ vm.getBw());
+				}
+				
 				data[k++] = row;
 			} catch (Exception e) {
 			}
@@ -258,16 +266,17 @@ public class Main {
 	}
 
 	public static Object[][] getVmMigrate() {
-		Map<Vm, Host> solu = SelVmMigrating.getSolution();
+		Map<Integer, List<Integer>> solu = SelVmMigrating.getSolution();
 		Object[][] data = new Object[solu.size()][];
-		Iterator<Entry<Vm, Host>> iterator = solu.entrySet().iterator();
+		Iterator<Entry<Integer, List<Integer>>> iterator = solu.entrySet().iterator();
 		int k = 0;
 		while (iterator.hasNext()) {
 			try {
-				Object[] row = new Object[2];
-				Entry<Vm, Host> entry = iterator.next();
-				row[0] = entry.getKey().getId();
-				row[1] = entry.getValue().getId();
+				Object[] row = new Object[3];
+				Entry<Integer, List<Integer>> entry = iterator.next();
+				row[0] = entry.getKey();
+				row[1]= entry.getValue().get(0);
+				row[2] = entry.getValue().get(1);
 				data[k++] = row;
 			} catch (Exception e) {
 			}

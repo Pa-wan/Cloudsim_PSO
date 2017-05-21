@@ -39,7 +39,7 @@ public class VmAllocationPolicyPSO2 extends VmAllocationPolicy{
 	@Override
 	public List<Map<String, Object>> optimizeAllocation(
 			List<? extends Vm> vmList) {
-		int particleNum=100,gen=400;
+		int particleNum=100,gen=1000;
 		//double w=1,c1=3,c2=0.3;
 		List<Vm> vms=(List<Vm>) vmList;
 		PSO pso=new PSO(particleNum,gen,vms,getHostList());
