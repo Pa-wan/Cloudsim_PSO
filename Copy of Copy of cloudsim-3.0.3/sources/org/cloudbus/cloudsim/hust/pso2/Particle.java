@@ -34,13 +34,10 @@ public class Particle {
 	public int count;// 最差适应度值次数
 	private double utilAvg[];// 单个物理机平均利用率向量
 	public static int runtimes;
-	private int cnt;
-
 	public Particle(List<Vm> vms, List<Host> hosts) {
 		hostlist = ExtHelper.createHostList(hosts.size()); // 创建物理机
 		vmlist = ExtHelper.createVmList(Main.brokerId, vms.size());
 		this.dims = vmlist.size();
-		cnt = 0;
 		pos = new int[dims];
 		v = new int[dims];
 		pbest = new int[dims];
@@ -177,7 +174,6 @@ public class Particle {
 			vmTohost.put(vm.getUid(), fitList.get(pos[vm.getId()]).getId());
 //			updateResource(vm, fitList.get(pos[vm.getId()]));
 		}
-		cnt++;
 	}
 
 	/**

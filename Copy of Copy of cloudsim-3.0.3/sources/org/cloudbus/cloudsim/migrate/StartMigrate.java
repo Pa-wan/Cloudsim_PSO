@@ -1,5 +1,6 @@
 package org.cloudbus.cloudsim.migrate;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,12 +9,14 @@ import java.util.Random;
 
 import org.cloudbus.cloudsim.Host;
 import org.cloudbus.cloudsim.Vm;
+import org.cloudbus.cloudsim.ui.GlobalObject;
 
 public class StartMigrate implements Runnable {
 	private List<Host> hostList;
 	private List<double[][]> triLoadInHost; // 主机预测前三个周期的利用率
 	private double[][] triUtilToHost; // 主机三个指标的利用率矩阵
 	private static Map<Vm, ArrayList<Double>> triUtilToVm;
+	private DecimalFormat dft = new DecimalFormat("###.##");
 
 	// private Map<Vm, ArrayList<Double>>
 	public StartMigrate(List<Host> hostlist) {
@@ -29,12 +32,32 @@ public class StartMigrate implements Runnable {
 	}
 
 	public void run() {
-
+		int cnt=0;
+		String indent = "		";
+		FileUtil.writeMethod1("主机编号"+indent+"CPU"+indent+"内存"+indent+"带宽");
 		while (true) {
+//			System.out.println(cnt++);
+			GlobalObject.getjTextField1().setText(String.valueOf(cnt++));
 			HostDynamicLoad();
+			for(Host host:hostList){
+				double uCPU=(host.getTotalMips()-host.getAvailableMips())/host.getTotalMips();
+				double uRam=host.getRamProvisioner().getUsedRam()/(host.getRam()+0.0);
+				double uBw=host.getBwProvisioner().getUsedBw()/(host.getBw()+0.0);
+//				System.out.println(host.getId()+"： "+uCPU+" "+uRam+" "+uBw);
+				FileUtil.writeMethod2(host.getId()+indent+dft.format(uCPU)+indent+dft.format(uRam)+indent+dft.format(uBw));
+			}
+			FileUtil.writeMethod2("============vm migrating status============\n虚拟机编号\t源主机\t目的主机");
 			triLoadInHost.add(getUtilToHost());
 			Prediction.predict(hostList, triLoadInHost);
 			SelVmMigrating.selectVms(triUtilToVm);
+			for(Host host:hostList){
+				double uCPU=(host.getTotalMips()-host.getAvailableMips())/host.getTotalMips();
+				double uRam=host.getRamProvisioner().getUsedRam()/(host.getRam()+0.0);
+				double uBw=host.getBwProvisioner().getUsedBw()/(host.getBw()+0.0);
+//				System.out.println(host.getId()+"： "+uCPU+" "+uRam+" "+uBw);
+				FileUtil.writeMethod2(host.getId()+indent+dft.format(uCPU)+indent+dft.format(uRam)+indent+dft.format(uBw));
+			}
+			
 			try {
 				Thread.sleep(3000);
 				triLoadInHost.remove(0);

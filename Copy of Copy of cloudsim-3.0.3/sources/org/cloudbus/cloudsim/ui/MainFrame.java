@@ -254,6 +254,7 @@ public class MainFrame extends JFrame {
 		GlobalObject.setjTable2(jTable2);
 		GlobalObject.setjScrollPane3(jScrollPane3);
 		GlobalObject.setjTable3(jTable3);
+		GlobalObject.setjTextField1(jTextField1);
 		Start_Migrate.setText("动态模拟");
 
 		Start_Migrate.addMouseListener(new MouseAdapter() {

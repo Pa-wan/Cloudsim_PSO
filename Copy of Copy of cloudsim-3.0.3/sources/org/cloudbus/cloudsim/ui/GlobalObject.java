@@ -2,6 +2,7 @@ package org.cloudbus.cloudsim.ui;
 
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 
 public class GlobalObject {
 	    /**
@@ -10,7 +11,14 @@ public class GlobalObject {
 	    private static JScrollPane jScrollPane1;
 	    private static JScrollPane jScrollPane2;
 	    private static JScrollPane jScrollPane3;
-	    /**
+	    private static JTextField jTextField1;
+	    public static JTextField getjTextField1() {
+			return jTextField1;
+		}
+		public static void setjTextField1(JTextField jTextField1) {
+			GlobalObject.jTextField1 = jTextField1;
+		}
+		/**
 	     * 全局JTable
 	     */
 	    private static JTable jTable1;

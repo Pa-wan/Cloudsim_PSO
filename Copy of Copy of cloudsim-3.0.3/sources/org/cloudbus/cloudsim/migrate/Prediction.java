@@ -10,6 +10,7 @@ public class Prediction {
 	private static List<Host> unHotList;
 	private static double a = 0.6;
 	private static List<double[][]> loadToHost;// 计算得到的5次预测负载
+	private static double Qmax =0.8;
 
 	public static void predict(List<Host> hostlist,
 			List<double[][]> triLoadToHost) {
@@ -41,15 +42,17 @@ public class Prediction {
 		int[] cnt = new int[size];
 		for (int i = 0; i < size; i++) {
 			for (int j = 0; j < 5; j++) {
-				if (loadToHost.get(j)[i][0] < 0.5
-						&& loadToHost.get(j)[i][1] < 0.5
-						&& loadToHost.get(j)[i][2] < 0.5) {
+				if (loadToHost.get(j)[i][0] <Qmax
+						&& loadToHost.get(j)[i][1] < Qmax
+						&& loadToHost.get(j)[i][2] < Qmax) {
 				} else {
 					cnt[i]++;
 				}
 			}
 			if (cnt[i] >= 4) {
 				hotList.add(hostList.get(i));
+				if(hotList.size()==0)
+					Qmax=Qmax-0.1;
 			} else {
 				unHotList.add(hostList.get(i));
 			}

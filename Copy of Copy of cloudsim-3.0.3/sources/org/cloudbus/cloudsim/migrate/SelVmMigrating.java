@@ -53,6 +53,7 @@ public class SelVmMigrating {
 			if (bestHost == null) {
 				
 			} else {
+				FileUtil.writeMethod2(vmMigrating.getId()+"\t"+host.getId()+"\t"+bestHost.getId());
 				temp.add(bestHost.getId());
 				bestHost.addMigratingInVm(vmMigrating);
 				bestHost.vmCreate(vmMigrating);
@@ -62,6 +63,7 @@ public class SelVmMigrating {
 				List<Double> list = new ArrayList<Double>();
 				list.add(vmMigrating.getCurrentRequestedTotalMips());
 				vmMigrating.setCurrentAllocatedMips(list);
+				host.vmDestroy(vmMigrating);
 			}
 			
 		}

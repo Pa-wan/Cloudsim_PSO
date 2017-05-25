@@ -257,7 +257,7 @@ public class Main {
 						* 100 / host.getRam());
 				row[4] = decfmt.format(host.getBwProvisioner().getUsedBw()
 						* 100 / host.getBw());
-				row[5] = decfmt.format(host.getLoad());
+				row[5] = decfmt.format(host.getLoad()*100);
 				data[k++] = row;
 			} catch (Exception e) {
 			}
@@ -267,21 +267,24 @@ public class Main {
 
 	public static Object[][] getVmMigrate() {
 		Map<Integer, List<Integer>> solu = SelVmMigrating.getSolution();
-		Object[][] data = new Object[solu.size()][];
-		Iterator<Entry<Integer, List<Integer>>> iterator = solu.entrySet().iterator();
-		int k = 0;
-		while (iterator.hasNext()) {
-			try {
-				Object[] row = new Object[3];
-				Entry<Integer, List<Integer>> entry = iterator.next();
-				row[0] = entry.getKey();
-				row[1]= entry.getValue().get(0);
-				row[2] = entry.getValue().get(1);
-				data[k++] = row;
-			} catch (Exception e) {
+		if(solu!=null){
+			Object[][] data = new Object[solu.size()][];
+			Iterator<Entry<Integer, List<Integer>>> iterator = solu.entrySet().iterator();
+			int k = 0;
+			while (iterator.hasNext()) {
+				try {
+					Object[] row = new Object[3];
+					Entry<Integer, List<Integer>> entry = iterator.next();
+					row[0] = entry.getKey();
+					row[1]= entry.getValue().get(0);
+					row[2] = entry.getValue().get(1);
+					data[k++] = row;
+				} catch (Exception e) {
+				}
 			}
+			return data;
 		}
-		return data;
+		return null;
 	}
 
 	public static void test() {	

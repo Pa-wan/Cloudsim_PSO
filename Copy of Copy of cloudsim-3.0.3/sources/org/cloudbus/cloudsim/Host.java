@@ -56,8 +56,6 @@ public class Host {
 	/** The datacenter where the host is placed. */
 	private Datacenter datacenter;
 	
-	private double load;
-
 	/**
 	 * Instantiates a new host.
 	 * 
