@@ -1,18 +1,11 @@
 package org.cloudbus.cloudsim.ui;
 
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-
 import javax.swing.table.DefaultTableModel;
 
 import org.cloudbus.cloudsim.policy.VmsToHosts.Main;
 
 public class RefreshThread implements Runnable {
-	private int cond;
-	private Lock lock;
-	private Condition condition;
-
 	private Semaphore A;
 	private Semaphore B;
 
@@ -22,7 +15,6 @@ public class RefreshThread implements Runnable {
 	}
 
 	public void run() {
-		// lock.lock();
 		try {
 			while (true) {
 				B.acquire();

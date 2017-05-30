@@ -55,17 +55,16 @@ public class SelVmMigrating {
 			} else {
 				FileUtil.writeMethod2(vmMigrating.getId()+"\t"+host.getId()+"\t"+bestHost.getId());
 				temp.add(bestHost.getId());
+				host.vmDestroy(vmMigrating);
+//				bestHost.vmCreate(vmMigrating);
+				vmMigrating.setHost(bestHost);
 				bestHost.addMigratingInVm(vmMigrating);
-				bestHost.vmCreate(vmMigrating);
-				bestHost.getVmList().add(vmMigrating);
 				solution.put(vmMigrating.getId(), temp);
 				vmMigrating.setCurrentAllocatedSize(vmMigrating.getSize());
 				List<Double> list = new ArrayList<Double>();
 				list.add(vmMigrating.getCurrentRequestedTotalMips());
-				vmMigrating.setCurrentAllocatedMips(list);
-				host.vmDestroy(vmMigrating);
-			}
-			
+				vmMigrating.setCurrentAllocatedMips(list);		
+			}		
 		}
 	}
 

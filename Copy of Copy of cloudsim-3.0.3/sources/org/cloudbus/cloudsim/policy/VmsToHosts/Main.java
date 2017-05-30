@@ -8,14 +8,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
 import org.cloudbus.cloudsim.Cloudlet;
 import org.cloudbus.cloudsim.Host;
 import org.cloudbus.cloudsim.Log;
@@ -79,8 +72,7 @@ public class Main {
 				storageMap.put(host.getId(), host.getStorage());
 			}
 
-			// 通过工厂进行调用，传入接口实例
-			ExtDatacenter datacenter = (ExtDatacenter) ExtHelper
+			ExtHelper
 					.createDatacenterByVmAllocationPolicyFactory("Datacenter",
 							ExtDatacenter.class, hostList, vmAllocationFac);
 
@@ -219,8 +211,12 @@ public class Main {
 
 	}
 
+	/**
+	 * vm to host including util
+	 * @return
+	 */
 	public static Object[][] getVmToHost() {
-		Object[][] data = new Object[vmlist.size()][];
+		Object[][] data = new Object[vmlist.size()+1][];
 		int k = 0;
 		Map<Vm, ArrayList<Double>> triUtilToVm=StartMigrate.getTriUtilToVm();
 		for (Vm vm : vmlist) {
@@ -248,8 +244,12 @@ public class Main {
 		return data;
 	}
 
+	/**
+	 * vms in host including host`s util
+	 * @return
+	 */
 	public static Object[][] getVmsInHost() {
-		Object[][] data = new Object[hostList.size()][];
+		Object[][] data = new Object[hostList.size()+1][];
 		int k = 0;
 		for (Host host : hostList) {
 			try {
@@ -277,7 +277,7 @@ public class Main {
 	public static Object[][] getVmMigrate() {
 		Map<Integer, List<Integer>> solu = SelVmMigrating.getSolution();
 		if(solu!=null){
-			Object[][] data = new Object[solu.size()][];
+			Object[][] data = new Object[solu.size()+1][];
 			Iterator<Entry<Integer, List<Integer>>> iterator = solu.entrySet().iterator();
 			int k = 0;
 			while (iterator.hasNext()) {
@@ -293,15 +293,10 @@ public class Main {
 			}
 			return data;
 		}
-		return null;
+		else return null;
 	}
 
 	public static void test() throws InterruptedException {	
-		ExecutorService executor = Executors.newFixedThreadPool(2);
-		int cond = 1;//通过cond来确定A B C的输出
-		Lock lock = new ReentrantLock();//通过JDK5中的锁来保证线程的访问的互斥
-		Condition condition = lock.newCondition();//线程协作
-//        CountDownLatch latch = new CountDownLatch(1);  
 		B.acquire();
 		StartMigrate startMigrate = new StartMigrate(A,B,hostList);
 		RefreshThread refreshThread = new RefreshThread(A,B);

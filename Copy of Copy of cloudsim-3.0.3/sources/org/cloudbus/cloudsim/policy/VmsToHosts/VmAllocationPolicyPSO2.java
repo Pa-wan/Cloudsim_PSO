@@ -13,8 +13,6 @@ import org.cloudbus.cloudsim.VmAllocationPolicy;
 import org.cloudbus.cloudsim.hust.pso2.PSO;
 import org.cloudbus.cloudsim.hust.pso2.Utils;
 
-import com.sun.org.apache.bcel.internal.generic.RETURN;
-
 public class VmAllocationPolicyPSO2 extends VmAllocationPolicy{
 	private Map<String, Integer> vmToHost;
 	private static Map<Integer,ArrayList<Integer>> vmsInHost;
@@ -39,7 +37,7 @@ public class VmAllocationPolicyPSO2 extends VmAllocationPolicy{
 	@Override
 	public List<Map<String, Object>> optimizeAllocation(
 			List<? extends Vm> vmList) {
-		int particleNum=100,gen=1000;
+		int particleNum=100,gen=700;
 		//double w=1,c1=3,c2=0.3;
 		List<Vm> vms=(List<Vm>) vmList;
 		PSO pso=new PSO(particleNum,gen,vms,getHostList());

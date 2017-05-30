@@ -6,25 +6,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-
 import org.cloudbus.cloudsim.Host;
 import org.cloudbus.cloudsim.Vm;
 import org.cloudbus.cloudsim.ui.GlobalObject;
 
 public class StartMigrate implements Runnable {
 	private List<Host> hostList;
-	private CountDownLatch latch;
 	private List<double[][]> triLoadInHost; // 主机预测前三个周期的利用率
 	private double[][] triUtilToHost; // 主机三个指标的利用率矩阵
 	private static Map<Vm, ArrayList<Double>> triUtilToVm;
 	private DecimalFormat dft = new DecimalFormat("###.##");
-	private int cond;
-	private Lock lock;
-	private Condition condition;
 	private Semaphore A;
 	private Semaphore B;
 
@@ -38,7 +30,7 @@ public class StartMigrate implements Runnable {
 		this.A = a;
 		this.B = b;
 		triLoadInHost = new ArrayList<double[][]>();
-		triUtilToVm = new HashMap<Vm, ArrayList<Double>>();
+		
 		triUtilToHost = new double[hostList.size()][3];
 		for (int i = 0; i < 2; i++) {
 			HostDynamicLoad();
@@ -90,13 +82,13 @@ public class StartMigrate implements Runnable {
 				triLoadInHost.remove(0);
 			}
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 
 	private void HostDynamicLoad() {
 		Random rnd = new Random();
+		triUtilToVm = new HashMap<Vm, ArrayList<Double>>();
 		for (Host host : hostList) {
 			ArrayList<Double> temp1 = new ArrayList<Double>();
 			new ArrayList<Double>();
