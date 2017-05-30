@@ -259,7 +259,12 @@ public class MainFrame extends JFrame {
 
 		Start_Migrate.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(java.awt.event.MouseEvent evt) {
-				Main.test();
+				try {
+					Main.test();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			}
 		});
 		GroupLayout layout = new GroupLayout(getContentPane());

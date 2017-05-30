@@ -8,6 +8,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.cloudbus.cloudsim.Cloudlet;
 import org.cloudbus.cloudsim.Host;
@@ -33,6 +40,8 @@ public class Main {
 	public static Map<Integer, Long> storageMap;// 物理机固有的存储，Host类中不保存该值
 	public static int userId = 5;
 	private static DecimalFormat decfmt = new DecimalFormat("##.##");
+	private static Semaphore A = new Semaphore(1);
+    private static Semaphore B = new Semaphore(1);
 
 	public static void init(String policyName) {
 		// public static void init(){
@@ -287,10 +296,18 @@ public class Main {
 		return null;
 	}
 
-	public static void test() {	
-		StartMigrate t1 = new StartMigrate(hostList);
-		RefreshThread t2 = new RefreshThread();
-		new Thread(t1).start();
-		new Thread(t2).start();
+	public static void test() throws InterruptedException {	
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		int cond = 1;//通过cond来确定A B C的输出
+		Lock lock = new ReentrantLock();//通过JDK5中的锁来保证线程的访问的互斥
+		Condition condition = lock.newCondition();//线程协作
+//        CountDownLatch latch = new CountDownLatch(1);  
+		B.acquire();
+		StartMigrate startMigrate = new StartMigrate(A,B,hostList);
+		RefreshThread refreshThread = new RefreshThread(A,B);
+		Thread t1=new Thread(startMigrate);
+		Thread t2=new Thread(refreshThread);
+		t1.start();
+		t2.start();
 	}
 }
