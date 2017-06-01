@@ -46,14 +46,15 @@ public class Particle {
 		pbest_fitness = Double.MAX_VALUE;
 		vmTohost = new HashMap<String, Integer>();
 		utilAvg = new double[hostlist.size()];
+		fitList=new ArrayList<Host>();
 	}
 
 	public void init() {
-
-		fitList = hostlist;
+		for(Host host:hostlist)
+			fitList.add(host);
 		rnd = new Random();
 		for (Vm vm : vmlist) {
-			updateVmList(vm);
+			fitList=updateVmList(vm);
 			int size = fitList.size();
 			if (size != 0) {
 				int idx = rnd.nextInt(size);
@@ -65,7 +66,7 @@ public class Particle {
 				vmTohost.put(vm.getUid(), host.getId());
 				pbest[vm.getId()] = pos[vm.getId()];
 				v[vm.getId()] = rnd.nextInt(fitList.size()) - pos[vm.getId()];
-				// updateResource(vm, host);
+				 updateResource(vm, host);
 			}
 		}
 		calcuMd();
@@ -129,8 +130,8 @@ public class Particle {
 		double load = 0;
 		// 在对物理机进行均衡度计算时才更新每个物理机的资源状态
 		for (Host host : hostlist) {
-			for (Vm vm : host.getVmList())
-				updateResource(vm, host);
+//			for (Vm vm : host.getVmList())
+//				updateResource(vm, host);
 			double uCPU=(host.getTotalMips()-host.getAvailableMips())/host.getTotalMips();
 			double uRam=host.getRamProvisioner().getUsedRam()/(host.getRam()+0.0);
 			double uBw=host.getBwProvisioner().getUsedBw()/(host.getBw()+0.0);
@@ -145,7 +146,6 @@ public class Particle {
 			}
 			pbest_fitness = fitness;
 		}
-		// reset();// 每个粒子评估结束之后还原主机资源，以确保下一个粒子能正确计算负载
 
 	}
 
@@ -157,7 +157,7 @@ public class Particle {
 //		w = 0.9 - (0.9-0.4)/ 400 * cnt;
 		c1=c2=2;
 		for (Vm vm : vmlist) {
-			updateVmList(vm);
+			fitList=updateVmList(vm);
 			size = fitList.size();
 			v[vm.getId()] = (int) (w * v[vm.getId()] + c1 * rnd.nextDouble()
 					* (pbest[vm.getId()] - pos[vm.getId()]) + c2
@@ -169,23 +169,24 @@ public class Particle {
 			if (v[vm.getId()] < -pos[vm.getId()]) {
 				v[vm.getId()] = -pos[vm.getId()];
 			}
-			pos[vm.getId()] = pos[vm.getId()] + v[vm.getId()];
+			pos[vm.getId()]  +=  v[vm.getId()];
 			fitList.get(pos[vm.getId()]).getVmList().add(vm);// 第i个vm放入第pos[i]个host
 			vmTohost.put(vm.getUid(), fitList.get(pos[vm.getId()]).getId());
-//			updateResource(vm, fitList.get(pos[vm.getId()]));
+			updateResource(vm, fitList.get(pos[vm.getId()]));
 		}
 	}
 
 	/**
 	 * 更新每个虚拟机可以匹配的主机列表
 	 */
-	private void updateVmList(Vm vm) {
-		fitList = new ArrayList<Host>();
+	private List<Host> updateVmList(Vm vm) {
+		List<Host >fitlist = new ArrayList<Host>();
 		for (Host host : hostlist) {
 			if (Utils.isSuitable(vm, host)) {
-				fitList.add(host);// 将符合条件的物理主机放入数组中
+				fitlist.add(host);// 将符合条件的物理主机放入数组中
 			}
 		}
+		return fitlist;
 	}
 
 	public double getFitness() {

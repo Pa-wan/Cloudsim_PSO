@@ -71,7 +71,9 @@ public abstract class BwProvisioner {
 	 * @pre $none
 	 * @post none
 	 */
-	public abstract void deallocateBwForVm(Vm vm);
+	public void deallocateBwForVm(Vm vm){
+		setAvailableBw(getAvailableBw()+vm.getBw());
+	}
 
 	/**
 	 * Releases BW used by a all VMs.

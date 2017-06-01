@@ -286,6 +286,7 @@ public class Host {
 			vmDeallocate(vm);
 			getVmList().remove(vm);
 			vm.setHost(null);
+			vm.setBeingInstantiated(true);
 		}
 	}
 

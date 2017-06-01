@@ -70,7 +70,9 @@ public abstract class RamProvisioner {
 	 * @pre $none
 	 * @post none
 	 */
-	public abstract void deallocateRamForVm(Vm vm);
+	public  void deallocateRamForVm(Vm vm){
+		setAvailableRam(getAvailableRam()+vm.getRam());
+	}
 
 	/**
 	 * Releases BW used by a all VMs.

@@ -198,7 +198,8 @@ public class Vm {
 		if (isBeingInstantiated()) {
 			return getBw();
 		}
-		return (long) (getCloudletScheduler().getCurrentRequestedUtilizationOfBw() * getBw());
+		long temp=(long) (getCloudletScheduler().getCurrentRequestedUtilizationOfBw() * getBw());
+		return temp;
 	}
 
 	/**

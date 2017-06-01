@@ -72,7 +72,7 @@ public class Main {
 				storageMap.put(host.getId(), host.getStorage());
 			}
 
-			ExtHelper
+			 ExtDatacenter datacenter = (ExtDatacenter) ExtHelper
 					.createDatacenterByVmAllocationPolicyFactory("Datacenter",
 							ExtDatacenter.class, hostList, vmAllocationFac);
 
@@ -88,7 +88,7 @@ public class Main {
 			broker.submitVmList(vmlist);
 
 			double start = System.currentTimeMillis();
-			CloudSim.startSimulation();
+			double lastClock=CloudSim.startSimulation();
 			double end = System.currentTimeMillis();
 			System.out.println("time: " + (end - start) / 1000 + "s");
 
@@ -296,7 +296,7 @@ public class Main {
 		else return null;
 	}
 
-	public static void test() throws InterruptedException {	
+	public static void migrate() throws InterruptedException {	
 		B.acquire();
 		StartMigrate startMigrate = new StartMigrate(A,B,hostList);
 		RefreshThread refreshThread = new RefreshThread(A,B);

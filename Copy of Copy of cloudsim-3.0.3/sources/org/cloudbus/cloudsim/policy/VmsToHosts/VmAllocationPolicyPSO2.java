@@ -51,6 +51,7 @@ public class VmAllocationPolicyPSO2 extends VmAllocationPolicy{
 			Entry<String,Integer> entry=it.next();
 			Host host=pso.getHostById().get(entry.getValue());
 			Vm vm=pso.getVmByUid().get(entry.getKey());
+//			System.out.println(host.getId()+"→"+vm.getId());
 			if(!vmsInHost.containsKey(host.getId())){
 				ArrayList<Integer> list=new ArrayList<Integer>();
 				list.add(vm.getId());
@@ -58,10 +59,14 @@ public class VmAllocationPolicyPSO2 extends VmAllocationPolicy{
 			}else{
 				vmsInHost.get(host.getId()).add(vm.getId());
 			}
-			host.vmCreate(vm);//更新资源，CurrentAllocatedMips,CurrentAllocatedSize
+			if(host.vmCreate(vm)){
+				//更新资源，CurrentAllocatedMips,CurrentAllocatedSize
 			host.getVmList().add(vm);
-			vm.setCurrentAllocatedSize(vm.getSize());
 			Utils.updateVmResource(vm);
+			}
+			else{
+				
+			}
 		}
 		Object map=vmToHost;
 		List<Map<String, Object>> list=new ArrayList<Map<String,Object>>();

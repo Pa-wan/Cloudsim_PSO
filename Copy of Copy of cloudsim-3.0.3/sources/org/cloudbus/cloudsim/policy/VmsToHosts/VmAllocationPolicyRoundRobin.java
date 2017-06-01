@@ -43,7 +43,7 @@ public class VmAllocationPolicyRoundRobin extends VmAllocationPolicy implements 
 	}
 	
     boolean tryToAllocateVmToHost(Host host, Vm vm) {
-        if(host.isSuitableForVm(vm)) {
+        if(Utils.isSuitable(vm, host)) {
             boolean result = host.vmCreate(vm);
             if(result) {
                 printLogMsg("Vm created successfuly");

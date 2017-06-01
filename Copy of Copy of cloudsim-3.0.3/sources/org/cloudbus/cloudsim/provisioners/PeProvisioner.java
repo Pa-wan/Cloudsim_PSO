@@ -123,7 +123,9 @@ public abstract class PeProvisioner {
 	 * @pre $none
 	 * @post none
 	 */
-	public abstract void deallocateMipsForVm(Vm vm);
+	public void deallocateMipsForVm(Vm vm){
+		setAvailableMips(getAvailableMips()+vm.getNumberOfPes()*getAvailableMips());
+	}
 
 	/**
 	 * Releases MIPS used by all VMs.

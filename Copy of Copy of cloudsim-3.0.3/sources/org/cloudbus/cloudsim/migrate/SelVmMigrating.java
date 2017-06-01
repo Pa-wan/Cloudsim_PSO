@@ -1,5 +1,6 @@
 package org.cloudbus.cloudsim.migrate;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -21,14 +22,27 @@ public class SelVmMigrating {
 	private static Map<Integer, List<Integer>> solution;
 	private static double bestDistance;
 	private static Host bestHost;
+	private static boolean flag;
+	private static DecimalFormat dft = new DecimalFormat("###.##");
 
-	public static void selectVms(Map<Vm, ArrayList<Double>> triUtilToVm) {
+	public static  void selectVms() {
 		hotList = Prediction.getHotList();
 		lossToVm = new HashMap<Vm, Double>();
-		loadToVm = triUtilToVm;
+		loadToVm = StartMigrate.getTriUtilToVm();
 		bestDistance = Double.MAX_VALUE;
 		solution=new HashMap<Integer, List<Integer>>();
+		flag=false;
+		String indent = "		";
 		for (Host host : hotList) {
+			double uCPU = (host.getTotalMips() - host
+					.getAvailableMips()) *100/ host.getTotalMips();
+			double uRam = host.getRamProvisioner().getUsedRam()*100
+					/ (host.getRam() + 0.0);
+			double uBw = host.getBwProvisioner().getUsedBw()*100
+					/ (host.getBw() + 0.0);
+			FileUtil.writeMethod2(host.getId() + indent
+					+ dft.format(uCPU) + indent + dft.format(uRam)
+					+ indent + dft.format(uBw));
 			double[] load=new double[3];
 			lossToVm.clear();
 			for (Vm vm : host.getVmList()) {
@@ -51,21 +65,26 @@ public class SelVmMigrating {
 			temp.add(host.getId());
 			bestHost = selectHostMigrate(vmMigrating);			
 			if (bestHost == null) {
-				
+//				System.out.println(vmMigrating.getId()+"选择迁移主机失败");
 			} else {
+				vmMigrateToHost(host, vmMigrating, bestHost);
 				FileUtil.writeMethod2(vmMigrating.getId()+"\t"+host.getId()+"\t"+bestHost.getId());
 				temp.add(bestHost.getId());
-				host.vmDestroy(vmMigrating);
-//				bestHost.vmCreate(vmMigrating);
-				vmMigrating.setHost(bestHost);
-				bestHost.addMigratingInVm(vmMigrating);
 				solution.put(vmMigrating.getId(), temp);
-				vmMigrating.setCurrentAllocatedSize(vmMigrating.getSize());
-				List<Double> list = new ArrayList<Double>();
-				list.add(vmMigrating.getCurrentRequestedTotalMips());
-				vmMigrating.setCurrentAllocatedMips(list);		
+				 uCPU = (host.getTotalMips() - host
+						.getAvailableMips()) *100/ host.getTotalMips();
+				 uRam = host.getRamProvisioner().getUsedRam()*100
+						/ (host.getRam() + 0.0);
+				 uBw = host.getBwProvisioner().getUsedBw()*100
+						/ (host.getBw() + 0.0);
+				FileUtil.writeMethod2(host.getId() + indent
+						+ dft.format(uCPU) + indent + dft.format(uRam)
+						+ indent + dft.format(uBw));
+				flag=true;
 			}		
 		}
+		if(flag==false)
+			Prediction.setQmax(Prediction.getQmax()+0.1);
 	}
 
 	private static Host selectHostMigrate(Vm vm) {
@@ -93,6 +112,17 @@ public class SelVmMigrating {
 		return selHost;
 	}
 	
+	private static void vmMigrateToHost(Host reHost,Vm vm,Host desHost) {
+		reHost.vmDestroy(vm);
+		vm.setCurrentAllocatedBw(0);
+		vm.setCurrentAllocatedMips(null);
+		vm.setCurrentAllocatedRam(0);
+		vm.setCurrentAllocatedSize(0);
+		vm.setHost(desHost);
+		desHost.addMigratingInVm(vm);
+		Utils.updateVmResource(vm);			
+		
+	}
 	public static Map<Integer, List<Integer>> getSolution(){
 		return solution;
 	}

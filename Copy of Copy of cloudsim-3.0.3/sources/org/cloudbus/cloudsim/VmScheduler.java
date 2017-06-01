@@ -76,7 +76,10 @@ public abstract class VmScheduler {
 	 * @pre $none
 	 * @post $none
 	 */
-	public abstract void deallocatePesForVm(Vm vm);
+	public void deallocatePesForVm(Vm vm){
+		getMipsMap().remove(vm.getUid());
+		setAvailableMips(getAvailableMips()+vm.getMips()*vm.getNumberOfPes());
+	}
 
 	/**
 	 * Releases PEs allocated to all the VMs.
